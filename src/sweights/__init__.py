@@ -1,5 +1,5 @@
-__version__ = 0.0.1
-from sweight import sweight
-from cow import cow
-from independence import kendall_tau
-from covariance import cov_correct, approx_cov_correct
+__version__ = '0.0.1'
+from sweights.sweight import sweight
+from sweights.cow import cow
+from sweights.independence import kendall_tau
+from sweights.covariance import cov_correct, approx_cov_correct

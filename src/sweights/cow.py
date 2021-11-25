@@ -4,7 +4,7 @@ from scipy import linalg
 import numpy as np
 
 class cow():
-  def __init__(self, mrange, gs, gb, Im=1, obs=None, renorm=True):
+  def __init__(self, mrange, gs, gb, Im=1, obs=None, renorm=True, verbose=True):
     '''
     mrange: a two element tuple for the integration range in mass
     gs:     a function for the signal (numerator) must accept a single argument in this case mass
@@ -37,14 +37,17 @@ class cow():
       f = lambda m: w[ np.argmin( m >= xe )-1 ]
       self.Im = np.vectorize(f)
 
+    if verbose: print('Initialising COW:')
     # compute Wkl matrix
     self.Wkl = self.compWkl()
-    print('Found Wkl Matrix:')
-    print( '\t', str(self.Wkl).replace('\n','\n\t ') )
+    if verbose:
+      print('    W-matrix:')
+      print( '\t'+ str(self.Wkl).replace('\n','\n\t ') )
     # invert for Akl matrix
     self.Akl = linalg.solve( self.Wkl, np.identity( len(self.Wkl) ), assume_a='pos' )
-    print('Found Akl Matrix:')
-    print( '\t', str(self.Akl).replace('\n','\n\t ') )
+    if verbose:
+      print('    A-matrix:')
+      print( '\t'+ str(self.Akl).replace('\n','\n\t ') )
 
   def normalise(self, f):
     if self.renorm:

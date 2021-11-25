@@ -1,10 +1,9 @@
 # vim: ts=4 sw=4 et
 
 import numpy as np
-from scipy.integrate import quad, nquad
+from scipy.integrate import nquad
 from scipy.linalg import solve
 from scipy.interpolate import InterpolatedUnivariateSpline
-import matplotlib.pyplot as plt
 
 class sweight():
 
@@ -42,8 +41,23 @@ class sweight():
           if iminuit.version.version.split('.')[0]=='1':
             raise RuntimeError( 'iminuit version must be > 2.x' )
 
+        if self.method=='tsplot':
+          try:
+            import ROOT as r
+          except:
+            raise RuntimeError( 'To run sweight with tsplot method ROOT must be installed')
+
+        if self.method=='roofit':
+          try:
+            import ROOT as r
+            from ROOT import RooFit as rf
+            from ROOT import RooStats as rs
+          except:
+            raise RuntimeError( 'To run sweight with roofit method ROOT with RooFit must be installed')
+
+
         self.verbose = verbose
-        if self.verbose: print('Initialising SWeighter with the', self.method, 'method:')
+        if self.verbose: print('Initialising sweight with the', self.method, 'method:')
 
         # get data in right format
         self.data = data
@@ -166,7 +180,7 @@ class sweight():
             return self.alphas
 
         if self.verbose:
-            print('    alpha-matrix:')
+            print('    A-matrix:')
             print('\t' + str(self.alphas).replace('\n','\n\t'))
 
         return self.alphas
@@ -187,6 +201,11 @@ class sweight():
 
         while len(dopts)<self.ncomps:
           dopts.append('b')
+
+        try:
+          import matplotlib.pyplot as plt
+        except:
+          raise RuntimeError('matplotlib must be installed to make the weight plot')
 
         ax = axis or plt.gca()
 
@@ -245,7 +264,6 @@ class sweight():
         datfile.close()
 
         # now make the tree and draw some plots to check it
-        import ROOT as r
         r.gROOT.SetBatch()
 
         tree = r.TTree('data','data')
@@ -288,9 +306,6 @@ class sweight():
         if self.method!='roofit':
             raise RuntimeError('Method is',self.method,'but calling the roofit function.')
 
-        import ROOT as r
-        from ROOT import RooFit as rf
-        from ROOT import RooStats as rs
         r.RooMsgService.instance().setGlobalKillBelow( rf.FATAL )
         r.gErrorIgnoreLevel = r.kInfo
 

@@ -1,17 +1,19 @@
 ## Demonstrates some examples of the package
 
 ## external requirements
+import os
+from argparse import ArgumentParser
 import numpy as np
 from scipy.stats import norm, expon, uniform
+from scipy.stats import kendalltau
 import matplotlib.pyplot as plt
 from iminuit import Minuit
 from iminuit.cost import ExtendedUnbinnedNLL
+from iminuit.pdg_format import pdg_format
 import boost_histogram as bh
 
 ## from this code
-from SWeighter import SWeight
-from Cow import cow
-from CovarianceCorrector import partial_derivative, cov_correct, full_cov_correct
+from sweights import sweight, cow, cov_correct, approx_cov_correct, kendall_tau
 
 # make a toy model
 
@@ -196,85 +198,110 @@ def wnll(tlb, tdata, wts):
   sigN = np.diff( sig.cdf(trange) )
   return -np.sum( wts * np.log( sig.pdf( tdata ) / sigN ) )
 
-## generate the toy
-toy = generate(Ns,Nb,mu,sg,lb,tlb,ret_true=True)
-plot(toy, save='__plots__/toy.png')
+if __name__ == '__main__':
 
-## fit the toy mass
-mi = Minuit( ExtendedUnbinnedNLL(toy[:,0], mpdf_min), Ns=Ns, Nb=Nb, mu=mu, sg=sg, lb=lb )
-mi.limits['Ns'] = (0,Ns+Nb)
-mi.limits['Nb'] = (0,Ns+Nb)
-mi.limits['mu'] = mrange
-mi.limits['sg'] = (0,mrange[1]-mrange[0])
-mi.limits['lb'] = (0,50)
+  parser = ArgumentParser()
+  parser.add_argument('-p','--makeplots'  , default=False, action='store_true', help='Make plots')
+  parser.add_argument('-d','--plotdir'    , default='__plots__'               , help='Save location for plots')
+  parser.add_argument('-s','--seed'       , default=None, type=int            , help='Set random seed')
+  parser.add_argument('-i','--interactive', default=False, action='store_true', help='Show plots interactively at the end')
+  parser.add_argument('-v','--verbose'    , default=False, action='store_true', help='Print more output')
+  args = parser.parse_args()
 
-mi.migrad()
-mi.hesse()
-print(mi)
+  if args.seed:
+    np.random.seed(args.seed)
 
-# get the sweights
-spdf = lambda m: mpdf(m,*mi.values,comps=['sig'])
-bpdf = lambda m: mpdf(m,*mi.values,comps=['bkg'])
+  if args.makeplots and not os.path.exists(args.plotdir):
+    os.system(f'mkdir -p {args.plotdir}')
 
-sweighter = SWeight( toy[:,0], [spdf,bpdf], [mi.values['Ns'],mi.values['Nb']], (mrange,), method='summation', compnames=('sig','bkg'), verbose=True, checks=False )
+  ## generate the toy
+  toy = generate(Ns,Nb,mu,sg,lb,tlb,ret_true=True)
+  if args.makeplots: plot(toy, save=f'{args.plotdir}/toy.png')
 
-# get the COW equivalent
-gs = lambda m: mpdf(m,*mi.values,comps=['sig']) / mi.values['Ns']
-gb = lambda m: mpdf(m,*mi.values,comps=['bkg']) / mi.values['Nb']
-Im = 1 #lambda m: mpdf(m,*mi.values) / (mi.values['Ns'] + mi.values['Nb'] )
+  ## print kendall rank coeff
+  kts = kendall_tau(toy[:,0],toy[:,1])
+  print('Kendall Tau:', pdg_format( kts[0], kts[1] ) )
 
-cw = cow(mrange, spdf, gb, Im)
+  ## fit the toy mass
+  mi = Minuit( ExtendedUnbinnedNLL(toy[:,0], mpdf_min), Ns=Ns, Nb=Nb, mu=mu, sg=sg, lb=lb )
+  mi.limits['Ns'] = (0,Ns+Nb)
+  mi.limits['Nb'] = (0,Ns+Nb)
+  mi.limits['mu'] = mrange
+  mi.limits['sg'] = (0,mrange[1]-mrange[0])
+  mi.limits['lb'] = (0,50)
 
-# compare the two
-flbs = []
-for meth, cls in zip( ['SW','COW'], [sweighter,cw] ):
+  mi.migrad()
+  mi.hesse()
+  if args.verbose: print(mi)
 
-  # plot weights
-  x = np.linspace(*mrange,400)
-  swp = cls.getWeight(0,x)
-  bwp = cls.getWeight(1,x)
-  plot_wts(x, swp, bwp, save=f'__plots__/{meth}_wts.png')
+  # define estimated functions
+  spdf = lambda m: mpdf(m,*mi.values,comps=['sig'])
+  bpdf = lambda m: mpdf(m,*mi.values,comps=['bkg'])
 
-  # fit weighted data
-  wts = cls.getWeight(0,toy[:,0])
-  nll = lambda tlb: wnll(tlb, toy[:,1], wts)
+  # make the sweighter
+  print('Compute sweights')
+  sweighter = sweight( toy[:,0], [spdf,bpdf], [mi.values['Ns'],mi.values['Nb']], (mrange,), method='summation', compnames=('sig','bkg'), verbose=args.verbose, checks=args.verbose )
 
-  # do the minimisation
-  tmi = Minuit( nll, tlb=tlb )
-  tmi.limits['tlb'] = (1,3)
-  tmi.errordef = Minuit.LIKELIHOOD
-  tmi.migrad()
-  tmi.hesse()
+  # get the COW equivalents (they should be normalised but the cow should also take care if they are not)
+  gs = lambda m: mpdf(m,*mi.values,comps=['sig']) / mi.values['Ns']
+  gb = lambda m: mpdf(m,*mi.values,comps=['bkg']) / mi.values['Nb']
+  Im = 1 #lambda m: mpdf(m,*mi.values) / (mi.values['Ns'] + mi.values['Nb'] )
 
-  # and do the correction
-  fval = np.array(tmi.values)
-  flbs.append(fval[0])
-  fcov = np.array( tmi.covariance.tolist() )
+  # make the cow
+  print('Compute cow weights')
+  cw = cow(mrange, spdf, gb, Im, verbose=args.verbose)
 
-  ncov = cov_correct(tpdf_cor, toy[:,1], wts, fval, fcov, verbose=True)
+  # compare the two
+  flbs = []
+  for meth, cls in zip( ['SW','COW'], [sweighter,cw] ):
 
-  # second order correction
-  hs  = tpdf_cor
-  ws  = lambda m: cls.getWeight(0,m)
-  W   = cls.Wkl
+    # plot weights
+    x = np.linspace(*mrange,400)
+    swp = cls.getWeight(0,x)
+    bwp = cls.getWeight(1,x)
+    if args.makeplots: plot_wts(x, swp, bwp, save=f'{args.plotdir}/{meth}_wts.png')
 
-  # these derivatives can be done numerically but for the sweights / COW case it's straightfoward to compute them
-  ws = lambda Wss, Wsb, Wbb, gs, gb: (Wbb*gs - Wsb*gb) / ((Wbb-Wsb)*gs + (Wss-Wsb)*gb)
-  dws_Wss = lambda Wss, Wsb, Wbb, gs, gb: gb * ( Wsb*gb - Wbb*gs ) / (-Wss*gb + Wsb*gs + Wsb*gb - Wbb*gs)**2
-  dws_Wsb = lambda Wss, Wsb, Wbb, gs, gb: ( Wbb*gs**2 - Wss*gb**2 ) / (Wss*gb - Wsb*gs - Wsb*gb + Wbb*gs)**2
-  dws_Wbb = lambda Wss, Wsb, Wbb, gs, gb: gs * ( Wss*gb - Wsb*gs ) / (-Wss*gb + Wsb*gs + Wsb*gb - Wbb*gs)**2
+    # fit weighted data
+    wts = cls.getWeight(0,toy[:,0])
+    nll = lambda tlb: wnll(tlb, toy[:,1], wts)
 
-  tcov = full_cov_correct(hs, [gs,gb], toy[:,1], toy[:,0], wts, [mi.values['Ns'],mi.values['Nb']], fval, fcov, [dws_Wss,dws_Wsb,dws_Wbb],[W[0,0],W[0,1],W[1,1]], verbose=True)
+    # do the minimisation
+    tmi = Minuit( nll, tlb=tlb )
+    tmi.limits['tlb'] = (1,3)
+    tmi.errordef = Minuit.LIKELIHOOD
+    tmi.migrad()
+    tmi.hesse()
 
-  print('Method:', meth, f'- covariance corrected {fval[0]:.1f} +/- {fcov[0,0]**0.5:.1f} ---> {fval[0]:.1f} +/- {tcov[0,0]**0.5:.1f}')
+    # and do the correction
+    fval = np.array(tmi.values)
+    flbs.append(fval[0])
+    fcov = np.array( tmi.covariance.tolist() )
 
-## plot weight T distribution
-swf  = lambda t: tpdf(t, mi.values['Ns'], 0, flbs[0], comps=['sig'] )
-cowf = lambda t: tpdf(t, mi.values['Ns'], 0, flbs[1], comps=['sig'] )
-sws  = sweighter.getWeight(0, toy[:,0])
-scow = cw.getWeight(0, toy[:,0])
+    # first order correction
+    ncov = approx_cov_correct(tpdf_cor, toy[:,1], wts, fval, fcov, verbose=args.verbose)
 
-plot_tweighted(toy[:,1], [sws,scow], ['SW','COW'], funcs=[swf,cowf], save='__plots__/tfit.png' )
+    # second order correction
+    hs  = tpdf_cor
+    ws  = lambda m: cls.getWeight(0,m)
+    W   = cls.Wkl
+
+    # these derivatives can be done numerically but for the sweights / COW case it's straightfoward to compute them
+    ws = lambda Wss, Wsb, Wbb, gs, gb: (Wbb*gs - Wsb*gb) / ((Wbb-Wsb)*gs + (Wss-Wsb)*gb)
+    dws_Wss = lambda Wss, Wsb, Wbb, gs, gb: gb * ( Wsb*gb - Wbb*gs ) / (-Wss*gb + Wsb*gs + Wsb*gb - Wbb*gs)**2
+    dws_Wsb = lambda Wss, Wsb, Wbb, gs, gb: ( Wbb*gs**2 - Wss*gb**2 ) / (Wss*gb - Wsb*gs - Wsb*gb + Wbb*gs)**2
+    dws_Wbb = lambda Wss, Wsb, Wbb, gs, gb: gs * ( Wss*gb - Wsb*gs ) / (-Wss*gb + Wsb*gs + Wsb*gb - Wbb*gs)**2
+
+    tcov = cov_correct(hs, [gs,gb], toy[:,1], toy[:,0], wts, [mi.values['Ns'],mi.values['Nb']], fval, fcov, [dws_Wss,dws_Wsb,dws_Wbb],[W[0,0],W[0,1],W[1,1]], verbose=args.verbose)
+
+    if args.verbose: print('Method:', meth, f'- covariance corrected {fval[0]:.1f} +/- {fcov[0,0]**0.5:.1f} ---> {fval[0]:.1f} +/- {tcov[0,0]**0.5:.1f}')
+
+  ## plot weight T distribution
+  swf  = lambda t: tpdf(t, mi.values['Ns'], 0, flbs[0], comps=['sig'] )
+  cowf = lambda t: tpdf(t, mi.values['Ns'], 0, flbs[1], comps=['sig'] )
+  sws  = sweighter.getWeight(0, toy[:,0])
+  scow = cw.getWeight(0, toy[:,0])
+
+  if args.makeplots: plot_tweighted(toy[:,1], [sws,scow], ['SW','COW'], funcs=[swf,cowf], save=f'{args.plotdir}/tfit.png' )
 
 
-plt.show()
+  if args.interactive: plt.show()
