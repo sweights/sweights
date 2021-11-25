@@ -42,14 +42,21 @@ python tests/examples.py
 
 This does the following:
 
-1. *Generate toy data*
+1. **Generate toy data** in two independent dimensions *m* and *t*
 
   ![toy](https://user-images.githubusercontent.com/1140576/142237277-0485e6e7-8ccf-489a-affd-6b81028ed5c3.png)
 
 2. *Fit the toy data* in the discriminanting variable to get an estimate of the discriminating variable pdfs
 
-3. *Compute sWeights* using the "summation" method (implemented by the `sweight` class provided) ![sws](https://user-images.githubusercontent.com/1140576/142237391-0b37f428-5668-4602-98bb-097fdaae62e8.png)
-4. *Compute sWeights* using the COW method with a variance function of unity, I(m)=1, (using the `cow` class provided) ![cows](https://user-images.githubusercontent.com/1140576/142237453-8c3dfa2b-b38d-4e22-96d8-30f31f61d1c8.png)
+3. *Compute sWeights* using the "summation" method (implemented by the `sweight` class provided)
 
-5. Fit the weighted distributions and correct the covariance using the `cov_correct` function provided ![tfit](https://user-images.githubusercontent.com/1140576/142237505-11032b1c-b6fa-47dc-9a0e-e965210fdf6b.png)
+  ![sws](https://user-images.githubusercontent.com/1140576/142237391-0b37f428-5668-4602-98bb-097fdaae62e8.png)
+
+4. *Compute sWeights* using the COW method with a variance function of unity, I(m)=1, (implemented by the `cow` class provided)
+
+  ![cows](https://user-images.githubusercontent.com/1140576/142237453-8c3dfa2b-b38d-4e22-96d8-30f31f61d1c8.png)
+
+5. *Fit the weighted distributions and correct the covariance* using the `cov_correct` function provided
+
+  ![tfit](https://user-images.githubusercontent.com/1140576/142237505-11032b1c-b6fa-47dc-9a0e-e965210fdf6b.png)
 
