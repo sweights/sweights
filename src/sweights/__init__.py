@@ -1,4 +1,4 @@
-__version__ = '0.0.1'
+__version__ = '0.0.3'
 from sweights.sweight import sweight
 from sweights.cow import cow
 from sweights.independence import kendall_tau

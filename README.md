@@ -1,5 +1,7 @@
 # sweights
 
+![](https://img.shields.io/pypi/v/sweights.svg)
+
 ```bash
 pip install sweights
 ```
