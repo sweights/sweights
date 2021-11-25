@@ -1,4 +1,8 @@
-# sweights package
+# sweights
+
+```bash
+pip install sweights
+```
 
 We provide a few tools for projecting component weights ("sweights") for a control variable(s) using a discriminating variable(s). For details please see [Dembinski, Kenzie, Langenbruch, Schmelling - arXiv:2112.XXXXX](https://arxiv.org/abs/2112.XXXXX).
 
