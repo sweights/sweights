@@ -1,4 +1,4 @@
-# vim: ts=4 sw=4 et
+# vim: ts=4 sw=4
 
 import numpy as np
 from scipy.integrate import nquad
@@ -6,13 +6,7 @@ from scipy.linalg import solve
 from scipy.interpolate import InterpolatedUnivariateSpline
 
 class sweight():
-
-    ### Need to pass:
-    ###    data:          must be a numpy ndarray with shape (nevs,ndiscvar)
-    ###    discvarranges: pass a range for the discriminating variables in which the pdfs are to be normalised
-    ###    pdfs:          a list of the component pdfs (these should be simple python functions or ROOT.RooAbsPdf if running with the 'roofit' method)
-    ###                   #TODO allow passing list of RooFit pdfs for other sweight methods
-    ###    yields:        a list of the component yields
+    """Produce sweights for a dataset given component pdfs."""
 
     def __init__(self,
                  data,
@@ -26,6 +20,63 @@ class sweight():
                  verbose=True,
                  checks=True
                 ):
+        """
+        Initialize sweight object.
+
+        This will compute the W and A (or alpha) matrices which are used to produce the weight
+        functions. Evaluation of these functions on a dataset is done in a different function
+        `getWeight`.
+
+        Parameters
+        ----------
+        data : ndarray
+            The dataset in the discriminating variable, should have shape (nevents,ndiscvars)
+            so for one discriminating variable will just be (N,) or (N,1).
+        pdfs : list of callable
+            A list of the component pdfs. These should be simple python callable functions which
+            are passed the same number of parameters as there are discriminating variables.
+            If running with the 'roofit' method (see `method`) then this can be a list of
+            ROOT.RooAbsPdf objects. If you only have your pdfs defined as RooFit objects then you
+            can use the wrapper function `convertRooAbsPdf` to convert them into the appropriate
+            object type for this call and then use other methods.
+        yields : list of float
+            A list of the component yields.
+        discvarranges : list of tuple or tuple of tuple, optional
+            The ranges for each discriminating variable, as a tuple or list of two element tuples
+            specifying the lower and upper bound for the range (the default is None which will use
+            minus to plus infinity)
+        method: str, optional
+            The sweights method to use. Must be one of 'summation', 'integration', 'subhess', 'tsplot',
+            'rootfit'. The recommended default is summation corresponding to Variant B of
+            `arXiv:2112.04574 <https://arxiv.org/abs/2112.04574>`_
+        compnames: list of str, optional
+            A list of the component names. Only used for the legend entries when making a plot of the
+            weight functions with `makeWeightPlot`
+        alphas: ndarray, optional
+            If using the 'subhess' method then the covariance matrix of a fit to the disciminanting
+            variable(s) in which only the yields float must also be passed. This matrix is inverted
+            to produce the W-matrix.
+        rfobs: list, optional
+            If using the 'roofit' method then the discriminating variables (of type RooRealVar) on which
+            the pdfs depend must also be passed
+        verbose: bool, optional
+            Print output
+        checks: bool, optional
+            Perform some checks that the derived weights are self consistent, in particular check that
+            the sum of all component weights for a given value of the discriminating variable(s) is unity,
+            and check that the sum of all weights for a given component reproduces the yields. This will
+            print additional output to the screen and issue warnings if checks are not passed.
+
+        Notes
+        -----
+        Many of the arguments passed and methods implemented are not strictly necessary. In particular the
+        'tsplot' and 'roofit' methods are just wrappers for implementations elsewhere that were originally
+        used as cross-checks. In future versions these two methods should be removed to simplify this call.
+
+        See Also
+        --------
+        getWeight, makeWeightPlot
+        """
 
         self.allowed_methods = ['summation','integration','refit','subhess','tsplot','roofit']
         self.method = method
@@ -135,6 +186,9 @@ class sweight():
         if checks: self.printChecks()
 
     def computeWMatrix(self):
+        """
+        Compute the W matrix
+        """
         self.Wkl = np.zeros( (self.ncomps,self.ncomps) )
         if self.method in ['refit','subhess','tsplot','roofit']:
           return self.Wkl
@@ -159,12 +213,20 @@ class sweight():
         return self.Wkl
 
     def nll(self, pars):
-      assert(len(pars)==self.ncomps)
-      nobs = sum(pars)
-      nest = np.sum( np.log( sum( [ pars[i]*pdf(*self.data.T)/self.pdfnorms[i] for i, pdf in enumerate(self.pdfs) ] ) ) )
-      return nobs - nest
+        """
+        Define NLL function to minimise if 'refit' method is used
+        """
+        assert(len(pars)==self.ncomps)
+        nobs = sum(pars)
+        nest = np.sum( np.log( sum( [ pars[i]*pdf(*self.data.T)/self.pdfnorms[i] for i, pdf in enumerate(self.pdfs) ] ) ) )
+        return nobs - nest
 
     def solveAlphas(self):
+        """
+        Compute the A (or alpha) matrix
+
+        Normally this is done by simply inverting the Wkl matrix
+        """
         if self.method in ['integration','summation']:
             sol = np.identity( len(self.Wkl) )
             self.alphas = solve( self.Wkl, sol, assume_a='pos' )
@@ -186,6 +248,23 @@ class sweight():
         return self.alphas
 
     def getWeight(self,icomp=0, *args):
+        """
+        Get the weights for a given component and set of discriminating
+        variable values
+
+        Parameters
+        ----------
+        icomp : int, optional
+            Get the weight function for the ith component
+        *args : ndarray
+            The values of the discriminating variables (one argument for each)
+            as numpy arrays
+
+        Returns
+        -------
+        ndarray
+            An array of the weights
+        """
         if self.method == 'tsplot':
             return self.tsplotw[icomp](*args)
         elif self.method == 'roofit':
@@ -194,7 +273,18 @@ class sweight():
             return sum( [self.alphas[i,icomp] * self.pdfs[i](*args)/self.pdfnorms[i] for i in range(self.ncomps)] ) / sum( [self.yields[i] * self.pdfs[i](*args)/self.pdfnorms[i] for i in range(self.ncomps)] )
 
     def makeWeightPlot(self, axis=None, dopts=['r','b','g','m','c','y'], labels=None):
+        """
+        Make a plot of the weight functions
 
+        Parameters
+        ----------
+        axis : optional
+            matplotlib axis to draw will default to use plt.gca()
+        dopts : list of str
+            List of colors for the different components
+        labels : list of str
+            List of legend labels. Default will use those passed in `compnames` with `__init__`
+        """
         if self.ndiscvars!=1:
             print('WARNING - I dont know how to plot this')
             return None
@@ -222,6 +312,9 @@ class sweight():
         ax.legend()
 
     def printChecks(self):
+        """
+        Print checks
+        """
         if self.method!='roofit':
             self.intws = np.identity( self.ncomps )
             for i in range(self.ncomps):
@@ -242,6 +335,9 @@ class sweight():
 
 
     def runTSPlot(self):
+        """
+        Run the TSPlot specific method
+        """
 
         if self.method!='tsplot':
             raise RuntimeError('Method is',self.method,'but calling the tsplot function.')
@@ -302,6 +398,9 @@ class sweight():
         return sorted_data_w_weights
 
     def runRooFit(self):
+        """
+        Run the RooFit specific method
+        """
 
         if self.method!='roofit':
             raise RuntimeError('Method is',self.method,'but calling the roofit function.')
@@ -374,42 +473,59 @@ class sweight():
         return sorted_data_w_weights
 
 def convertRooAbsPdf(pdf,obs,npoints=400,forcenorm=False):
-  '''
-  pdf:     the pdf, must inherit from RooAbsPdf (e.g. RooGaussian, RooExponential, RooAddPdf etc.)
-  obs:     the observable, must inherit from RooRealVarLValue but will usually be a RooRealVar which is
-  npoints: number of points to use for the interpolation
-  forcenorm: force the returned function to be normalised (should normally happen anyway)
-  returns a callable python function
-  '''
-  try:
-    import ROOT as r
-    from ROOT import RooFit as rf
-  except:
-    raise RuntimeError('ROOT and RooFit must be installed to convert a RooAbsPdf')
+    """
+    Helper function to convert a RooFit::RooAbsPdf object into a python callable that can be
+    used by either the `sweight` or `cow` classes
 
-  if not hasattr(obs,'InheritsFrom'):
-    raise RuntimeError('Observable does not appear to be a ROOT like object - it should inherit from RooAbsReal. Type: ', type(obs))
+    Parameters
+    ----------
+    pdf : RooAbsPdf
+        The pdf, must inherit from RooAbsPdf (e.g. RooGaussian, RooExponential, RooAddPdf etc.)
+    obs : RooRealVar
+        The observable, must inherit from RooRealVarLValue but will usually be a RooRealVar
+    npoints : int, optional
+        The number of points to use for the interpolation
+    forcenorm : bool, optional
+        Force the return function to be normalised by performing a numerical integration of it
+        (the function should in most cases be normalised properly anyway so this shouldn't be
+        needed)
 
-  if not obs.InheritsFrom('RooAbsRealLValue'):
-    raise RuntimeError('Observable does not appear to be of the right type - it should inherit from RooAbsRealLValue. Type: ', type(obs))
+    Returns
+    -------
+    callable :
+        A callable function representing a normalised pdf which can then be passed to the `sweight`
+        or `cow` classes
 
-  range = ( obs.getMin(), obs.getMax() )
+    """
+    try:
+        import ROOT as r
+        from ROOT import RooFit as rf
+    except:
+        raise RuntimeError('ROOT and RooFit must be installed to convert a RooAbsPdf')
 
-  xvals = np.linspace(*range,npoints)
+    if not hasattr(obs,'InheritsFrom'):
+        raise RuntimeError('Observable does not appear to be a ROOT like object - it should inherit from RooAbsReal. Type: ', type(obs))
 
-  yvals = []
+    if not obs.InheritsFrom('RooAbsRealLValue'):
+        raise RuntimeError('Observable does not appear to be of the right type - it should inherit from RooAbsRealLValue. Type: ', type(obs))
 
-  normset = r.RooArgSet(obs)
-  for x in xvals:
-    obs.setVal(x)
-    yvals.append( pdf.getVal(normset) )
+    range = ( obs.getMin(), obs.getMax() )
 
-  f = InterpolatedUnivariateSpline(xvals,yvals)
+    xvals = np.linspace(*range,npoints)
 
-  N = 1
-  if forcenorm:
-    N = nquad(f,(range,))[0]
+    yvals = []
 
-  retf = lambda x: f(x)/N
+    normset = r.RooArgSet(obs)
+    for x in xvals:
+        obs.setVal(x)
+        yvals.append( pdf.getVal(normset) )
 
-  return retf
+    f = InterpolatedUnivariateSpline(xvals,yvals)
+
+    N = 1
+    if forcenorm:
+        N = nquad(f,(range,))[0]
+
+    retf = lambda x: f(x)/N
+
+    return retf
