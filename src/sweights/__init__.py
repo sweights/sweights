@@ -1,4 +1,4 @@
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 from sweights.sweight import sweight, convertRooAbsPdf
 from sweights.cow import cow
 from sweights.independence import kendall_tau

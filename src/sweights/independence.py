@@ -2,6 +2,34 @@ import numpy as np
 from scipy.stats import kendalltau
 
 def kendall_tau(x,y):
+    """
+    Return kendall tau correlation coefficient.
+
+    Useful for ascertainting the extent to which two samples
+    are independent. In particular for sweights and COWs one
+    wants to know the extent to which the discriminant and
+    control variables factorise.
+
+    Parameters
+    ----------
+    x : ndarray
+        Values in the first dimension - must have the same shape as `y`
+    y : ndarray
+        Values in the second dimension - must have the same shape as `x`
+
+    Returns
+    -------
+    tuple :
+        Two element tuple with the coefficient and
+        its uncertainty
+
+    Notes
+    -----
+    `x` and `y` must have the same dimension.
+    This function now uses `scipy.stats.kendalltau` for the coefficent
+    calcualtion (the uncertainty calculation is trivial) which makes a
+    few optimisations. See the scipy documentation for more information.
+    """
     assert(len(x)==len(y))
     err_approx = 1./np.sqrt(len(x))
     return ( kendalltau(x,y).correlation, err_approx, kendalltau(x,y).pvalue )
