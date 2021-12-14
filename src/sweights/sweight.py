@@ -372,3 +372,44 @@ class sweight():
         sorted_data_w_weights = data_w_weights[np.argsort(data_w_weights[:,0])]
 
         return sorted_data_w_weights
+
+def convertRooAbsPdf(pdf,obs,npoints=400,forcenorm=False):
+  '''
+  pdf:     the pdf, must inherit from RooAbsPdf (e.g. RooGaussian, RooExponential, RooAddPdf etc.)
+  obs:     the observable, must inherit from RooRealVarLValue but will usually be a RooRealVar which is
+  npoints: number of points to use for the interpolation
+  forcenorm: force the returned function to be normalised (should normally happen anyway)
+  returns a callable python function
+  '''
+  try:
+    import ROOT as r
+    from ROOT import RooFit as rf
+  except:
+    raise RuntimeError('ROOT and RooFit must be installed to convert a RooAbsPdf')
+
+  if not hasattr(obs,'InheritsFrom'):
+    raise RuntimeError('Observable does not appear to be a ROOT like object - it should inherit from RooAbsReal. Type: ', type(obs))
+
+  if not obs.InheritsFrom('RooAbsRealLValue'):
+    raise RuntimeError('Observable does not appear to be of the right type - it should inherit from RooAbsRealLValue. Type: ', type(obs))
+
+  range = ( obs.getMin(), obs.getMax() )
+
+  xvals = np.linspace(*range,npoints)
+
+  yvals = []
+
+  normset = r.RooArgSet(obs)
+  for x in xvals:
+    obs.setVal(x)
+    yvals.append( pdf.getVal(normset) )
+
+  f = InterpolatedUnivariateSpline(xvals,yvals)
+
+  N = 1
+  if forcenorm:
+    N = nquad(f,(range,))[0]
+
+  retf = lambda x: f(x)/N
+
+  return retf
