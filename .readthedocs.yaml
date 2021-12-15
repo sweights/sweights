@@ -2,6 +2,10 @@
 
 version: 2
 
+build:
+  apt_packages:
+    - python-scipy
+
 submodules:
   include: all
 
