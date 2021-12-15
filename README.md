@@ -6,19 +6,19 @@
 pip install sweights
 ```
 
-We provide a few tools for projecting component weights ("sweights") for a control variable(s) using a discriminating variable(s). For details please see [Dembinski, Kenzie, Langenbruch, Schmelling - arXiv:2112.XXXXX](https://arxiv.org/abs/2112.XXXXX).
+We provide a few tools for projecting component weights ("sweights") for a control variable(s) using a discriminating variable(s). For details please see [Dembinski, Kenzie, Langenbruch, Schmelling - arXiv:2112.04574](https://arxiv.org/abs/2112.04574).
 
-We also provide tools for correcting the covariance matrix of fits to weighted data. For details please see [Dembinski, Kenzie, Langenbruch, Schmelling - arXiv:2112.XXXXX](https://arxiv.org/abs/2112.XXXXX) (Sec IV) and [Langenbruch - arXiv:1911.01303](https://arxiv.org/abs/1911.01303).
+We also provide tools for correcting the covariance matrix of fits to weighted data. For details please see [Dembinski, Kenzie, Langenbruch, Schmelling - arXiv:2112.04574](https://arxiv.org/abs/2112.04574) (Sec IV) and [Langenbruch - arXiv:1911.01303](https://arxiv.org/abs/1911.01303).
 
 ## Documentation
 
 A variety of options for extraction of signal-like weights is provided:
 
 - classic "sWeights" via the `sweight` class produces pure weight functions and provides the Wkl and Akl matrices
-  1. Using the "summation" method from the original sPlot paper [Pivk, Le Diberder - arXiv:physics/0402083](https://arxiv.org/abs/physics/0402083) referred to as Variant B in [arXiv:2112.XXXXX](https://arxiv.org/abs/2112.XXXXX)
-  2. Using the "integration" method rederived originally by Schmelling and referred to as Variant A in [arXiv:2112.XXXXX](https://arxiv.org/abs/2112.XXXXX)
-  3. Using the "refit" method, i.e. taking the covariance matrix of a yield only fit, referred to as Variant Ci in [arXiv:2112.XXXXX](https://arxiv.org/abs/2112.XXXXX)
-  4. Using the "subhess" method, i.e. taking the sub-covariance matrix for the yields, referred to as Variant Cii in [arXiv:2112.XXXXX](https://arxiv.org/abs/2112.XXXXX)
+  1. Using the "summation" method from the original sPlot paper [Pivk, Le Diberder - arXiv:physics/0402083](https://arxiv.org/abs/physics/0402083) referred to as Variant B in [arXiv:2112.04574](https://arxiv.org/abs/2112.04574)
+  2. Using the "integration" method rederived originally by Schmelling and referred to as Variant A in [arXiv:2112.04574](https://arxiv.org/abs/2112.04574)
+  3. Using the "refit" method, i.e. taking the covariance matrix of a yield only fit, referred to as Variant Ci in [arXiv:2112.04574](https://arxiv.org/abs/2112.04574)
+  4. Using the "subhess" method, i.e. taking the sub-covariance matrix for the yields, referred to as Variant Cii in [arXiv:2112.04574](https://arxiv.org/abs/2112.04574)
   5. Using the implementation in ROOT's TSPlot (this we believe should be equivalent to Variant B but is more susceptible to numerical differences)
   6. Using the implementation in RooStat's SPlot (we found this identical to Variant B ("summation") above in all the cases we tried)
 
@@ -29,8 +29,8 @@ A variety of options for extraction of signal-like weights is provided:
   - obs - one can instead or additionally pass the observed distribution in the discriminant variable which will be used for the variance function instead. In this case you must pass a two element tuple giving the bin entries and bin edges for the observed dataset (the same as what `np.histogram(data)` would return)
 
 Corrections to the covariance matrix can be implemented using
-- `cov_correct` which computes the full asymptotic correction using Eq. 55 in [arXiv:2112.XXXXX](https://arxiv.org/abs/2112.XXXXX)
-- `approx_cov_correct` is more straightfoward to compute but only computes the first term in Eq. 55 of [arXiv:2112.XXXXX](https://arxiv.org/abs/2112.XXXXX) which will be slightly conservative
+- `cov_correct` which computes the full asymptotic correction using Eq. 55 in [arXiv:2112.04574](https://arxiv.org/abs/2112.04574)
+- `approx_cov_correct` is more straightfoward to compute but only computes the first term in Eq. 55 of [arXiv:2112.04574](https://arxiv.org/abs/2112.04574) which will be slightly conservative
 
 A test of variable independence based on the Kendall tau coefficient is also provided in `kendall_tau`
 
@@ -41,6 +41,8 @@ An example script demonstrating a typical use case is provided in
 ```bash
 python tests/examples.py
 ```
+
+There is also a version written as a `.ipynb` in `doc/tutorial.ipynb`
 
 This does the following:
 
