@@ -2,12 +2,6 @@
 
 version: 2
 
-#build:
-  #apt_packages:
-    #- python-numpy
-    #- python-scipy
-    #- python-matplotlib
-
 submodules:
   include: all
 
