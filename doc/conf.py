@@ -5,6 +5,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 import os
+from sweights import __version__
 
 # -- Path setup --------------------------------------------------------------
 
@@ -19,13 +20,13 @@ import os
 
 # -- Project information -----------------------------------------------------
 
-project = 'sweights'
-copyright = '2021, Matthew Kenzie'
-author = 'Matthew Kenzie'
+project = "sweights"
+copyright = "2021, Matthew Kenzie"
+author = "Matthew Kenzie"
 
 # The full version, including alpha/beta/rc tags
-from sweights import __version__
-release = f'{__version__}'
+
+release = f"{__version__}"
 
 # http://read-the-docs.readthedocs.org/en/latest/theme.html#how-do-i-use-this-locally-and-on-read-the-docs
 # on_rtd is whether we are on readthedocs.org
@@ -54,7 +55,7 @@ autoclass_content = "both"
 autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # The suffix of source filenames.
 source_suffix = ".rst"
@@ -68,9 +69,9 @@ master_doc = "index"
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['_build', '_themes', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ["_build", "_themes", "Thumbs.db", ".DS_Store"]
 
-# The reST default role (used for this markup: `text`) to use for all documents.
+# The reST default role (used for this markup: `text`) to use for all documents
 # default_role = None
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
@@ -94,7 +95,7 @@ pygments_style = "sphinx"
 # -- Options for HTML output -------------------------------------------------
 
 # autodoc_member_order = "bysource"
-#autodoc_mock_imports = ["scipy"]
+# autodoc_mock_imports = ["scipy"]
 
 # html_logo = "_static/sweights_logo.svg"
 
@@ -106,12 +107,12 @@ pygments_style = "sphinx"
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-#html_theme = 'alaaster'
+# html_theme = 'alaaster'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -157,7 +158,7 @@ html_static_path = ['_static']
 # Output file base name for HTML help builder.
 htmlhelp_basename = "sweightsdoc"
 
-# -- Options for LaTeX output --------------------------------------------------
+# -- Options for LaTeX output -------------------------------------------------
 
 latex_elements = {
     # The paper size ('letterpaper' or 'a4paper').
@@ -169,9 +170,15 @@ latex_elements = {
 }
 
 # Grouping the document tree into LaTeX files. List of tuples
-# (source start file, target name, title, author, documentclass [howto/manual]).
+# (source start file, target name, title, author, documentclass [howto/manual])
 latex_documents = [
-    ("index", "latex.tex", "sweights Documentation", "Matthew Kenzie", "manual")
+    (
+        "index",
+        "latex.tex",
+        "sweights Documentation",
+        "Matthew Kenzie",
+        "manual"
+    )
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -195,17 +202,25 @@ latex_documents = [
 # latex_domain_indices = True
 
 
-# -- Options for manual page output --------------------------------------------
+# -- Options for manual page output -------------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [("index", "sweights", "sweights Documentation", ["Matthew Kenzie"], 1)]
+man_pages = [
+    (
+        "index",
+        "sweights",
+        "sweights Documentation",
+        ["Matthew Kenzie"],
+        1
+    )
+]
 
 # If true, show URL addresses after external links.
 # man_show_urls = False
 
 
-# -- Options for Texinfo output ------------------------------------------------
+# -- Options for Texinfo output -----------------------------------------------
 
 # Grouping the document tree into Texinfo files. List of tuples
 # (source start file, target name, title, author,

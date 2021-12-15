@@ -3,3 +3,5 @@ dist/
 src/sweights.egg-info
 **__pycache__
 **.DS_Store
+**.swp
+**.swo

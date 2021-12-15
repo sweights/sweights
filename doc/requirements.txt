@@ -4,4 +4,3 @@ matplotlib==3.5.0
 pillow==8.3.2
 sweights==0.0.4
 nbsphinx
-

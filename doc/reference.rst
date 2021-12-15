@@ -37,4 +37,3 @@ Utilities
 
 .. autofunction:: kendall_tau
 .. autofunction:: convertRooAbsPdf
-
