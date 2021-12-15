@@ -6,3 +6,4 @@ src/sweights.egg-info
 **.swp
 **.swo
 build/
+doc/.ipynb_checkpoints/

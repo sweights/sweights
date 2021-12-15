@@ -1,4 +1,4 @@
-"""Implementation of the sweight class."""
+"""Implementation of the SWeight class."""
 
 import numpy as np
 from scipy.integrate import nquad
@@ -6,7 +6,7 @@ from scipy.linalg import solve
 from scipy.interpolate import InterpolatedUnivariateSpline
 
 
-class sweight:
+class SWeight:
     """Produce sweights for a dataset given component pdfs."""
 
     def __init__(
@@ -23,11 +23,11 @@ class sweight:
         checks=True,
     ):
         """
-        Initialize sweight object.
+        Initialize SWeight object.
 
         This will compute the W and A (or alpha) matrices which are used to
         produce the weight functions. Evaluation of these functions on a
-        dataset is done in a different function `getWeight`.
+        dataset is done in a different function :func:`get_weight`.
 
         Parameters
         ----------
@@ -42,8 +42,8 @@ class sweight:
             'roofit' method (see `method`) then this can be a list of
             ROOT.RooAbsPdf objects. If you only have your pdfs defined as
             RooFit objects then you can use the wrapper function
-            `convertRooAbsPdf` to convert them into the appropriate object type
-            for this call and then use other methods.
+            :func:`convert_rf_pdf` to convert them into the appropriate object
+            type for this call and then use other methods.
         yields : list of float
             A list of the component yields.
         discvarranges : list of tuple or tuple of tuple, optional
@@ -57,7 +57,8 @@ class sweight:
             `arXiv:2112.04574 <https://arxiv.org/abs/2112.04574>`_
         compnames: list of str, optional
             A list of the component names. Only used for the legend entries
-            when making a plot of the weight functions with `makeWeightPlot`
+            when making a plot of the weight functions with
+            :func:`make_weight_plot`
         alphas: ndarray, optional
             If using the 'subhess' method then the covariance matrix of a fit
             to the disciminanting variable(s) in which only the yields float
@@ -86,7 +87,7 @@ class sweight:
 
         See Also
         --------
-        getWeight, makeWeightPlot
+        get_weight, make_weight_plot
         """
         self.allowed_methods = [
             "summation",
@@ -216,16 +217,16 @@ class sweight:
             self.compnames = [str(i) for i in range(self.ncomps)]
 
         # compute the W matrix
-        self._computeWMatrix()
+        self._compute_W_matrix()
 
         # solve the alpha matrix
-        self._solveAlphas()
+        self._solve_alphas()
 
         # do the tsplot implementation if asked
         self.tsplotweights = None
         self.tsplotw = None
         if self.method == "tsplot":
-            self.tsplotweights = self._runTSPlot()
+            self.tsplotweights = self._run_tsplot()
             self.tsplotw = [
                 InterpolatedUnivariateSpline(*self.tsplotweights[:, [0, i + 1]].T, k=3)
                 for i in range(self.ncomps)
@@ -242,7 +243,7 @@ class sweight:
                     length as the data when running with the roofit method"""
                 )
 
-            self.roofitweights = self._runRooFit()
+            self.roofitweights = self._run_roofit()
             self.roofitw = [
                 InterpolatedUnivariateSpline(*self.roofitweights[:, [0, i + 1]].T, k=3)
                 for i in range(self.ncomps)
@@ -250,9 +251,9 @@ class sweight:
 
         # print checks
         if checks:
-            self.printChecks()
+            self.print_checks()
 
-    def _computeWMatrix(self):
+    def _compute_W_matrix(self):
         self.Wkl = np.zeros((self.ncomps, self.ncomps))
         if self.method in ["refit", "subhess", "tsplot", "roofit"]:
             return self.Wkl
@@ -298,7 +299,7 @@ class sweight:
         )
         return nobs - nest
 
-    def _solveAlphas(self):
+    def _solve_alphas(self):
         if self.method in ["integration", "summation"]:
             sol = np.identity(len(self.Wkl))
             self.alphas = solve(self.Wkl, sol, assume_a="pos")
@@ -320,7 +321,7 @@ class sweight:
 
         return self.alphas
 
-    def getWeight(self, icomp=0, *args):
+    def get_weight(self, icomp=0, *args):
         """
         Return the weights.
 
@@ -357,7 +358,7 @@ class sweight:
                 ]
             )
 
-    def makeWeightPlot(
+    def make_weight_plot(
         self, axis=None, dopts=["r", "b", "g", "m", "c", "y"], labels=None
     ):
         """
@@ -394,7 +395,7 @@ class sweight:
         for comp in range(self.ncomps):
             ax.plot(
                 x,
-                self.getWeight(comp, x),
+                self.get_weight(comp, x),
                 color=dopts[comp],
                 linewidth=2,
                 label=labels[comp],
@@ -403,7 +404,7 @@ class sweight:
         label = labels[-1] if len(labels) > self.ncomps else r"$\sum_i w_{i}$"
         ax.plot(
             x,
-            sum([self.getWeight(c, x) for c in range(self.ncomps)]),
+            sum([self.get_weight(c, x) for c in range(self.ncomps)]),
             "k-",
             linewidth=3,
             label=label,
@@ -411,14 +412,14 @@ class sweight:
 
         ax.legend()
 
-    def printChecks(self):
+    def print_checks(self):
         """Print checks."""
         if self.method != "roofit":
             self.intws = np.identity(self.ncomps)
             for i in range(self.ncomps):
                 for j in range(self.ncomps):
                     self.intws[i, j] = nquad(
-                        lambda *args: self.getWeight(i, *args)
+                        lambda *args: self.get_weight(i, *args)
                         * self.pdfs[j](*args)
                         / self.pdfnorms[j],
                         self.discvarranges,
@@ -432,7 +433,7 @@ class sweight:
 
         print("    Check of weight sums (should match yields):")
         self.sows = [
-            np.sum(self.getWeight(i, *self.data.T)) for i in range(self.ncomps)
+            np.sum(self.get_weight(i, *self.data.T)) for i in range(self.ncomps)
         ]
         header = "\t{:10s} | {:^10s} | {:^10s} | {:^9s} |".format(
             "Component", "sWeightSum", "Yield", "Diff"
@@ -447,7 +448,7 @@ class sweight:
                 )
             )
 
-    def _runTSPlot(self):
+    def _run_tsplot(self):
 
         import ROOT as r
 
@@ -512,7 +513,7 @@ class sweight:
 
         return sorted_data_w_weights
 
-    def _runRooFit(self):
+    def _run_roofit(self):
 
         import ROOT as r
 
@@ -601,12 +602,13 @@ class sweight:
         return sorted_data_w_weights
 
 
-def convertRooAbsPdf(pdf, obs, npoints=400, forcenorm=False):
+def convert_rf_pdf(pdf, obs, npoints=400, forcenorm=False):
     """
     Convert RooAbsPdf into python callable.
 
     Helper function to convert a RooFit::RooAbsPdf object into a python
-    callable that can be used by either the `sweight` or `cow` classes
+    callable that can be used by either the :class:`SWeight` or :class:`Cow`
+    classes
 
     Parameters
     ----------
@@ -627,7 +629,7 @@ def convertRooAbsPdf(pdf, obs, npoints=400, forcenorm=False):
     -------
     callable :
         A callable function representing a normalised pdf which can then be
-        passed to the `sweight` or `cow` classes
+        passed to the :class:`SWeight` or :class:`Cow` classes
 
     """
     try:

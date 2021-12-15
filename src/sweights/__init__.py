@@ -4,17 +4,18 @@
 * Docs: https://sweights.readthedocs.io
 
 """
-__version__ = "0.0.4"
+__version__ = "0.0.5"
 __all__ = [
-    "sweight",
-    "convertRooAbsPdf",
-    "cow",
+    "SWeight",
+    "Cow",
+    "convert_rf_pdf",
     "kendall_tau",
+    "plot_indep_scatter",
     "cov_correct",
     "approx_cov_correct",
 ]
 
-from sweights.sweight import sweight, convertRooAbsPdf
-from sweights.cow import cow
-from sweights.independence import kendall_tau
+from sweights.sweight import SWeight, convert_rf_pdf
+from sweights.cow import Cow
+from sweights.independence import kendall_tau, plot_indep_scatter
 from sweights.covariance import cov_correct, approx_cov_correct

@@ -6,16 +6,16 @@ from scipy import linalg
 import numpy as np
 
 
-class cow:
+class Cow:
     """Produce weights using COWs."""
 
     def __init__(self, mrange, gs, gb, Im=1, obs=None, renorm=True, verbose=True):
         """
-        Initialize cow object.
+        Initialize Cow object.
 
         This will compute the W and A (or alpha) matrices which are used to
         produce the weight functions. Evaluation of these functions on a
-        dataset is done in a different function `getWeight`.
+        dataset is done in a different function :func:`get_weight`.
 
         Parameters
         ----------
@@ -49,7 +49,7 @@ class cow:
 
         See Also
         --------
-        getWeight
+        get_weight
         """
         self.renorm = renorm
         self.mrange = mrange
@@ -96,7 +96,7 @@ class cow:
             print("Initialising COW:")
 
         # compute Wkl matrix
-        self.Wkl = self._compWkl()
+        self.Wkl = self._comp_Wkl()
         if verbose:
             print("    W-matrix:")
             print("\t" + str(self.Wkl).replace("\n", "\n\t "))
@@ -114,7 +114,7 @@ class cow:
         else:
             return f
 
-    def _compWklElem(self, k, j):
+    def _comp_Wkl_elem(self, k, j):
 
         # check it's available in m
         assert k < len(self.gk)
@@ -132,7 +132,7 @@ class cow:
                 tint += quad(integral, le, he)[0]
             return tint
 
-    def _compWkl(self):
+    def _comp_Wkl(self):
 
         n = len(self.gk)
 
@@ -143,7 +143,7 @@ class cow:
                 if i > j:
                     ret[i, j] = ret[j, i]
                 else:
-                    ret[i, j] = self._compWklElem(i, j)
+                    ret[i, j] = self._comp_Wkl_elem(i, j)
 
         return ret
 
@@ -168,7 +168,7 @@ class cow:
             [self.Akl[k, j] * self.gk[j](m) / self.Im(m) for j in range(n)], axis=0
         )
 
-    def getWeight(self, k, m):
+    def get_weight(self, k, m):
         """
         Return the weights.
 

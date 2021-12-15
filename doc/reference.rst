@@ -10,20 +10,23 @@ Quick Summary
 These are the user facing classes and methods:
 
 .. autosummary::
-   sweight
-   cow
-   convertRooAbsPdf
+   SWeight
+   Cow
+   convert_rf_pdf
+   kendall_tau
+   cov_correct
+   approx_cov_correct
 
 SWeighter
 ---------
 
-.. autoclass:: sweight
+.. autoclass:: SWeight
    :members:
 
 COWs
 ----
 
-.. autoclass:: cow
+.. autoclass:: Cow
    :members:
 
 Covariance Correction
@@ -36,4 +39,4 @@ Utilities
 ---------
 
 .. autofunction:: kendall_tau
-.. autofunction:: convertRooAbsPdf
+.. autofunction:: convert_rf_pdf

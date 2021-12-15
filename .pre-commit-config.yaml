@@ -31,6 +31,15 @@ repos:
   - id: trailing-whitespace
     exclude: ^doc/_static/.*.svg
 
+# RTD requierments
+- repo: local
+  hooks:
+  - id: rtd-requirements
+    name: rtd-requirements
+    entry: python doc/requirements.py
+    language: system
+    pass_filenames: false
+
 # Python linter (Flake8)
 - repo: https://gitlab.com/pycqa/flake8
   rev: 3.9.2

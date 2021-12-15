@@ -48,7 +48,7 @@ def kendall_tau(x, y):
     return (factor * su, err_approx)
 
 
-def plot(x, y, save=None, show=False):
+def plot_indep_scatter(x, y, reduction_factor=1, save=None, show=False):
     """
     Plot scatter of two variables.
 
@@ -66,12 +66,19 @@ def plot(x, y, save=None, show=False):
         )
 
     fig, ax = plt.subplots()
-    ax.scatter(x, y)
-    tau, err = kendall_tau(x, y)
+    ax.scatter(x[::reduction_factor], y[::reduction_factor], s=1)
+    tau, err, pval = kendall_tau(x, y)
     ax.text(
         0.7,
         0.9,
         r"$\tau = " + str(u.ufloat(tau, err)).replace("+/-", r"\pm") + "$",
+        transform=ax.transAxes,
+        backgroundcolor="w",
+    )
+    ax.text(
+        0.7,
+        0.8,
+        f"$p = {pval:.2f}$",
         transform=ax.transAxes,
         backgroundcolor="w",
     )
@@ -93,4 +100,4 @@ if __name__ == "__main__":
 
     x = np.random.uniform(size=1000)
     y = np.random.uniform(size=1000)
-    plot(x, y)
+    plot_indep_scatter(x, y)

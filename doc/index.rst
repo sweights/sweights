@@ -11,6 +11,7 @@ Documentation for the sweights package
     about
     install
     tutorial
+    check_rf_conversion
     reference
     contribute
 
