@@ -48,7 +48,7 @@ repos:
   rev: 6.1.1
   hooks:
   - id: pydocstyle
-    files: src/iminuit/[^_].*\.py
+    files: src/sweights/[^_].*\.py
 
 # C++ formatting
 - repo: https://github.com/pre-commit/mirrors-clang-format
