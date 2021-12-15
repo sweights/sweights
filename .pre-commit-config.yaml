@@ -39,6 +39,7 @@ repos:
     entry: python doc/requirements.py
     language: system
     pass_filenames: false
+    exclude: doc/requirements.txt
 
 # Python linter (Flake8)
 - repo: https://gitlab.com/pycqa/flake8
