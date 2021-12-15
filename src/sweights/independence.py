@@ -1,3 +1,4 @@
+"""Module to check and plot independence."""
 import numpy as np
 from scipy.stats import kendalltau
 
@@ -48,12 +49,20 @@ def kendall_tau(x, y):
 
 
 def plot(x, y, save=None, show=False):
+    """
+    Plot scatter of two variables.
+
+    Plot a scatter graph of two variables and write the kendall tau
+    coefficient.
+    """
     try:
         import matplotlib.pyplot as plt
         import uncertainties as u
-    except:
+    except Exception:
         raise RuntimeError(
-            "matplotlib and uncertainties packages must be installed to plot independence \npip install matplotlib \npip install uncertainties"
+            """matplotlib and uncertainties packages must be installed to plot
+            independence \npip install matplotlib \npip install
+            uncertainties"""
         )
 
     fig, ax = plt.subplots()

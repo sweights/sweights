@@ -1,4 +1,4 @@
-# vim: ts=4 sw=4
+"""Implementation of the sweight class."""
 
 import numpy as np
 from scipy.integrate import nquad
@@ -88,7 +88,6 @@ class sweight:
         --------
         getWeight, makeWeightPlot
         """
-
         self.allowed_methods = [
             "summation",
             "integration",
@@ -200,7 +199,8 @@ class sweight:
         if self.method == "subhess":
             if alphas is None:
                 raise RuntimeError(
-                    "If using method subhess you must pass the covariance (alpha) matrix"
+                    """If using method subhess you must pass the covariance
+                    (alpha) matrix"""
                 )
         if (
             alphas is not None
@@ -216,16 +216,16 @@ class sweight:
             self.compnames = [str(i) for i in range(self.ncomps)]
 
         # compute the W matrix
-        self.computeWMatrix()
+        self._computeWMatrix()
 
         # solve the alpha matrix
-        self.solveAlphas()
+        self._solveAlphas()
 
         # do the tsplot implementation if asked
         self.tsplotweights = None
         self.tsplotw = None
         if self.method == "tsplot":
-            self.tsplotweights = self.runTSPlot()
+            self.tsplotweights = self._runTSPlot()
             self.tsplotw = [
                 InterpolatedUnivariateSpline(*self.tsplotweights[:, [0, i + 1]].T, k=3)
                 for i in range(self.ncomps)
@@ -238,10 +238,11 @@ class sweight:
         if self.method == "roofit":
             if len(self.rfobs) != self.ndiscvars:
                 raise RuntimeError(
-                    "You must pass a list of RooFit observables the same length as the data when running with the roofit method"
+                    """You must pass a list of RooFit observables the same
+                    length as the data when running with the roofit method"""
                 )
 
-            self.roofitweights = self.runRooFit()
+            self.roofitweights = self._runRooFit()
             self.roofitw = [
                 InterpolatedUnivariateSpline(*self.roofitweights[:, [0, i + 1]].T, k=3)
                 for i in range(self.ncomps)
@@ -251,7 +252,7 @@ class sweight:
         if checks:
             self.printChecks()
 
-    def computeWMatrix(self):
+    def _computeWMatrix(self):
         self.Wkl = np.zeros((self.ncomps, self.ncomps))
         if self.method in ["refit", "subhess", "tsplot", "roofit"]:
             return self.Wkl
@@ -282,7 +283,7 @@ class sweight:
 
         return self.Wkl
 
-    def nll(self, pars):
+    def _nll(self, pars):
         assert len(pars) == self.ncomps
         nobs = sum(pars)
         nest = np.sum(
@@ -297,14 +298,14 @@ class sweight:
         )
         return nobs - nest
 
-    def solveAlphas(self):
+    def _solveAlphas(self):
         if self.method in ["integration", "summation"]:
             sol = np.identity(len(self.Wkl))
             self.alphas = solve(self.Wkl, sol, assume_a="pos")
         elif self.method in ["refit"]:
             from iminuit import Minuit
 
-            mi = Minuit(self.nll, tuple(self.yields))
+            mi = Minuit(self._nll, tuple(self.yields))
             mi.errordef = Minuit.LIKELIHOOD
             mi.migrad()
             mi.hesse()
@@ -321,8 +322,10 @@ class sweight:
 
     def getWeight(self, icomp=0, *args):
         """
+        Return the weights.
+
         Get the weights for a given component and set of discriminating
-        variable values
+        variable values.
 
         Parameters
         ----------
@@ -358,7 +361,7 @@ class sweight:
         self, axis=None, dopts=["r", "b", "g", "m", "c", "y"], labels=None
     ):
         """
-        Make a plot of the weight functions
+        Make a plot of the weight functions.
 
         Parameters
         ----------
@@ -397,7 +400,7 @@ class sweight:
                 label=labels[comp],
             )
 
-        label = labels[-1] if len(labels) > self.ncomps else "$\sum_i w_{i}$"
+        label = labels[-1] if len(labels) > self.ncomps else r"$\sum_i w_{i}$"
         ax.plot(
             x,
             sum([self.getWeight(c, x) for c in range(self.ncomps)]),
@@ -409,9 +412,7 @@ class sweight:
         ax.legend()
 
     def printChecks(self):
-        """
-        Print checks
-        """
+        """Print checks."""
         if self.method != "roofit":
             self.intws = np.identity(self.ncomps)
             for i in range(self.ncomps):
@@ -422,7 +423,10 @@ class sweight:
                         / self.pdfnorms[j],
                         self.discvarranges,
                     )[0]
-            print("    Integral of w*pdf matrix (should be close to the identity):")
+            print(
+                """    Integral of w*pdf matrix (should be close to the
+                identity):"""
+            )
             # with np.printoptions(precision=3, suppress=True):
             print("\t" + str(self.intws).replace("\n", "\n\t"))
 
@@ -443,7 +447,7 @@ class sweight:
                 )
             )
 
-    def runTSPlot(self):
+    def _runTSPlot(self):
 
         import ROOT as r
 
@@ -508,7 +512,7 @@ class sweight:
 
         return sorted_data_w_weights
 
-    def runRooFit(self):
+    def _runRooFit(self):
 
         import ROOT as r
 
@@ -525,7 +529,8 @@ class sweight:
         for obs in self.rfobs:
             if not obs.InheritsFrom("RooAbsReal"):
                 raise RuntimeError(
-                    "Found an observable which does not inherit from RooAbsReal"
+                    """Found an observable which does not inherit from
+                    RooAbsReal"""
                 )
             rf_obs.add(obs)
 
@@ -579,7 +584,7 @@ class sweight:
             c.Print("figs/rf_%s.pdf" % obs.GetName())
 
         # now get the sweights using RooStats
-        rf_sp = r.RooStats.SPlot("sdata", "sdata", rf_dset, rf_totpdf, rf_ylds)
+        r.RooStats.SPlot("sdata", "sdata", rf_dset, rf_totpdf, rf_ylds)
 
         weights = np.zeros((rf_dset.numEntries(), self.ncomps))
 
@@ -598,6 +603,8 @@ class sweight:
 
 def convertRooAbsPdf(pdf, obs, npoints=400, forcenorm=False):
     """
+    Convert RooAbsPdf into python callable.
+
     Helper function to convert a RooFit::RooAbsPdf object into a python
     callable that can be used by either the `sweight` or `cow` classes
 
@@ -625,19 +632,20 @@ def convertRooAbsPdf(pdf, obs, npoints=400, forcenorm=False):
     """
     try:
         import ROOT as r
-        from ROOT import RooFit as rf
     except Exception:
         raise RuntimeError("ROOT and RooFit must be installed to convert a RooAbsPdf")
 
     if not hasattr(obs, "InheritsFrom"):
         raise RuntimeError(
-            "Observable does not appear to be a ROOT like object - it should inherit from RooAbsReal. Type: ",
+            """Observable does not appear to be a ROOT like object - it should
+            inherit from RooAbsReal. Type: """,
             type(obs),
         )
 
     if not obs.InheritsFrom("RooAbsRealLValue"):
         raise RuntimeError(
-            "Observable does not appear to be of the right type - it should inherit from RooAbsRealLValue. Type: ",
+            """Observable does not appear to be of the right type - it should
+            inherit from RooAbsRealLValue. Type: """,
             type(obs),
         )
 
@@ -658,6 +666,7 @@ def convertRooAbsPdf(pdf, obs, npoints=400, forcenorm=False):
     if forcenorm:
         N = nquad(f, (range,))[0]
 
-    retf = lambda x: f(x) / N
+    def retf(x):
+        return f(x) / N
 
     return retf

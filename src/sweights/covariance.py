@@ -1,10 +1,13 @@
-# implements a covariance correction for weighted data fits
+"""Implementation of covariance correction for weighted fits."""
+
 import numpy as np
 from scipy.misc import derivative
 
-## derivative of function pdf with respect to variable at index var
-## evaluated at point point
-def partial_derivative(pdf, var, point, data):
+# derivative of function pdf with respect to variable at index var
+# evaluated at point point
+
+
+def _partial_derivative(pdf, var, point, data):
     args = point[:]
 
     def wraps(x):
@@ -14,23 +17,16 @@ def partial_derivative(pdf, var, point, data):
     return derivative(wraps, point[var], dx=1e-6)
 
 
-# you should pass the pdf function
-# which must be in the form pdf(data,*pars) e.g. a 1D Gaussian would be pdf(x,mean,sigma)
-# then pass the data (should be an appropriate degree numpy array to be passed to your pdf
-# then pass the weights (should have same shape as data)
-# then pass the fit values and fitted covariance of the nominal fit
-
-
 def approx_cov_correct(pdf, data, wts, fvals, fcov, verbose=False):
     """
-    Perform a first order covariance correction for a fit to weighted data
+    Perform a first order covariance correction for a fit to weighted data.
 
     Parameters
     ----------
     pdf : callable
-        The control variable pdf which must take arguments (x, p0,...,pn) which has
-        been fitted to a weighted dataset, where x is the observable and p0 ... pn
-        are the shape parameters
+        The control variable pdf which must take arguments (x, p0,...,pn)
+        which has been fitted to a weighted dataset, where x is the observable
+        and p0 ... pn are the shape parameters
     data : ndarray
         The data values of the observable at which the pdf is evaluated
     wts : ndarray
@@ -38,8 +34,8 @@ def approx_cov_correct(pdf, data, wts, fvals, fcov, verbose=False):
     fvals : array_like
         A list of the fitted values of the shape parameters p0,....,pn
     fcov : ndarray
-        A covariance matrix of the weighted likelihood fit before the correction (this
-        is normally available from the minmiser e.g. iminuit)
+        A covariance matrix of the weighted likelihood fit before the
+        correction (this is normally available from the minmiser e.g. iminuit)
     verbose : bool, optional
         Print some output
 
@@ -51,16 +47,17 @@ def approx_cov_correct(pdf, data, wts, fvals, fcov, verbose=False):
     Notes
     -----
     This function corresponds to the weighted score function with independent
-    weights (first term of Eq.51 in `arXiv:2112.04574 <https://arxiv.org/abs/2112.04574>`_).
-    This is often a good approximation for sweights although will be an overestimate.
-    For a better correction for sweights use `cov_correct` (which is only in general accurate
-    when the shape parameters in the discriminating variable are known)
+    weights (first term of Eq.51 in
+    `arXiv:2112.04574 <https://arxiv.org/abs/2112.04574>`_).
+    This is often a good approximation for sweights although will be an
+    overestimate. For a better correction for sweights use `cov_correct` (which
+    is only in general accurate when the shape parameters in the discriminating
+    variable are known)
 
     See Also
     --------
     cov_correct
     """
-
     dim = len(fvals)
     assert fcov.shape[0] == dim and fcov.shape[1] == dim
 
@@ -69,9 +66,9 @@ def approx_cov_correct(pdf, data, wts, fvals, fcov, verbose=False):
     prob = pdf(data, *fvals)
 
     for j in range(dim):
-        derivj = partial_derivative(pdf, j, fvals, data)
+        derivj = _partial_derivative(pdf, j, fvals, data)
         for k in range(dim):
-            derivk = partial_derivative(pdf, k, fvals, data)
+            derivk = _partial_derivative(pdf, k, fvals, data)
 
             Djk[j, k] = np.sum(wts ** 2 * (derivj * derivk) / prob ** 2)
 
@@ -91,21 +88,24 @@ def cov_correct(
     hs, gxs, hdata, gdata, weights, Nxs, fvals, fcov, dw_dW_fs, Wvals, verbose=False
 ):
     """
-    Perform a second order covariance correction for a fit to weighted data
+    Perform a second order covariance correction for a fit to weighted data.
 
     Parameters
     ----------
     hs : callable
-        The control variable pdf which must take arguments (x, p0,...,pn) which has
-        been fitted to a weighted dataset, where x is the observable and p0 ... pn
-        are the shape parameters
+        The control variable pdf which must take arguments (x, p0,...,pn)
+        which has been fitted to a weighted dataset, where x is the observable
+        and p0 ... pn are the shape parameters
     gxs : list of callable
-        A list of the disciminant variable pdfs which must take a single argument (x)
-        where x is the observable (shape parameters of gxs must be known in this case)
+        A list of the disciminant variable pdfs which must take a single
+        argument (x), where x is the observable (shape parameters of gxs must
+        be known in this case)
     hdata : ndarray
-        The data values of the control variable observable at which the `hs` pdf is evaluated
+        The data values of the control variable observable at which the `hs`
+        pdf is evaluated
     gdata : ndarray
-        The data values of the disciminant variable observable at which the `gxs` pdfs are evaluated
+        The data values of the disciminant variable observable at which the
+        `gxs` pdfs are evaluated
     weights : ndarray
         The values of the weights
     Nxs : list of float or tuple of float
@@ -113,12 +113,12 @@ def cov_correct(
     fvals : array_like
         A list of the fitted values of the shape parameters p0,....,pn
     fcov : ndarray
-        A covariance matrix of the weighted likelihood fit before the correction (this
-        is normally available from the minmiser e.g. iminuit)
+        A covariance matrix of the weighted likelihood fit before the
+        correction (this is normally available from the minmiser e.g. iminuit)
     dw_dW_fs : list of callable
-        A list of the functions describing the partial derivate of the weight function with
-        respect to the W matrix elements (see the `tests/example.py` tutorial to see this
-        passed for sweights and COWs)
+        A list of the functions describing the partial derivate of the weight
+        function with respect to the W matrix elements (see the tutorial to see
+        this passed for sweights and COWs)
     Wvals : list of float or tuple of float
         A list of the W matrix elements
     verbose : bool, optional
@@ -131,13 +131,13 @@ def cov_correct(
 
     Notes
     -----
-    This function corresponds to the weighted score function with sweights (both terms of
-    Eq.51 in `arXiv:2112.04574 <https://arxiv.org/abs/2112.04574>`_). If the shape parameters
-    of the `gxs` are not known then the full sandwich estimate must be used which is not yet
-    implemented in this package.
+    This function corresponds to the weighted score function with sweights
+    (both terms of Eq.51 in
+    `arXiv:2112.04574 <https://arxiv.org/abs/2112.04574>`_).
+    If the shape parameters of the `gxs` are not known then the full sandwich
+    estimate must be used which is not yet implemented in this package.
 
     """
-
     dim_kl = len(fvals)
     assert fcov.shape[0] == dim_kl and fcov.shape[1] == dim_kl
 
@@ -153,11 +153,11 @@ def cov_correct(
 
     # now construct the E and C' matrices
     Ekl = np.empty((dim_kl, dim_E))
-    for l in range(dim_kl):
-        derivl = partial_derivative(hs, l, fvals, hdata)
+    for j in range(dim_kl):
+        derivj = _partial_derivative(hs, j, fvals, hdata)
         gxevs = [gx(gdata) for gx in gxs]
         for xy in range(dim_E):
-            Ekl[l, xy] = np.sum(dw_dW_fs[xy](*Wvals, *gxevs) * derivl)
+            Ekl[j, xy] = np.sum(dw_dW_fs[xy](*Wvals, *gxevs) * derivj)
 
     Ckl = np.empty((dim_E, dim_E))
     gtot = np.sum([Nxs[i] * gxs[i](gdata) for i in range(dim_xy)], axis=0)
