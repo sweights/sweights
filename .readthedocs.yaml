@@ -2,10 +2,6 @@
 
 version: 2
 
-build:
-  tools:
-    python: "3.8"
-
 submodules:
   include: all
 
@@ -13,6 +9,7 @@ sphinx:
   configuration: doc/conf.py
 
 python:
+  version: "3.8"
   install:
     - requirements: doc/requirements.txt
     - method: pip
