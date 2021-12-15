@@ -86,7 +86,7 @@ add_function_parentheses = True
 # show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = "sphinx"
+# pygments_style = "sphinx"
 
 # A list of ignored prefixes for module index sorting.
 # modindex_common_prefix = []
@@ -172,13 +172,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual])
 latex_documents = [
-    (
-        "index",
-        "latex.tex",
-        "sweights Documentation",
-        "Matthew Kenzie",
-        "manual"
-    )
+    ("index", "latex.tex", "sweights Documentation", "Matthew Kenzie", "manual")
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -206,15 +200,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [
-    (
-        "index",
-        "sweights",
-        "sweights Documentation",
-        ["Matthew Kenzie"],
-        1
-    )
-]
+man_pages = [("index", "sweights", "sweights Documentation", ["Matthew Kenzie"], 1)]
 
 # If true, show URL addresses after external links.
 # man_show_urls = False
