@@ -12,6 +12,8 @@ We also provide tools for correcting the covariance matrix of fits to weighted d
 
 ## Documentation
 
+**The below documentation is now superseeded as it has been moved to readthedocs**. Please go to https://sweights.readthedocs.io for the latest.
+
 A variety of options for extraction of signal-like weights is provided:
 
 - classic "sWeights" via the `sweight` class produces pure weight functions and provides the Wkl and Akl matrices
