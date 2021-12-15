@@ -21,5 +21,8 @@ python:
     - method: pip
       path: .
       extra_requirements:
+        - numpy
+        - scipy
+        - matplotlib
         - doc
   system_packages: true
