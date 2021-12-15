@@ -4,7 +4,9 @@ version: 2
 
 build:
   apt_packages:
+    - python-numpy
     - python-scipy
+    - python-matplotlib
 
 submodules:
   include: all
@@ -15,7 +17,6 @@ sphinx:
 python:
   version: "3.8"
   install:
-    - requirements: doc/requirements.txt
     - method: pip
       path: .
       extra_requirements:

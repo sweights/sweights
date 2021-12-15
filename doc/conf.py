@@ -94,7 +94,7 @@ pygments_style = "sphinx"
 # -- Options for HTML output -------------------------------------------------
 
 # autodoc_member_order = "bysource"
-autodoc_mock_imports = ["scipy"]
+#autodoc_mock_imports = ["scipy"]
 
 # html_logo = "_static/sweights_logo.svg"
 
