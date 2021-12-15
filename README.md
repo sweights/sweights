@@ -65,4 +65,3 @@ This does the following:
 5. **Fit the weighted distributions and correct the covariance** using the `cov_correct` function provided
 
   ![tfit](https://user-images.githubusercontent.com/1140576/142237505-11032b1c-b6fa-47dc-9a0e-e965210fdf6b.png)
-

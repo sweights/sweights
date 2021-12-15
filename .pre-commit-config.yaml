@@ -36,7 +36,6 @@ repos:
   rev: 3.9.2
   hooks:
   - id: flake8
-    files: src/sweights/[^_].*\.py
 
 # Python formatting
 - repo: https://github.com/psf/black

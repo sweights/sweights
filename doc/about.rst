@@ -16,4 +16,3 @@ Maintainers
 -----------
 
 * Matthew Kenzie (@matthewkenzie)
-
