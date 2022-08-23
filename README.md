@@ -1,8 +1,8 @@
 # sweights
 
-![https://pypi.org/project/sweights/](https://img.shields.io/pypi/v/sweights.svg) 
-![https://sweights.readthedocs.io/en/latest/](https://readthedocs.org/projects/sweights/badge/?version=latest) 
-![https://arxiv.org/abs/2112.04574](https://img.shields.io/badge/arXiv-2112.04574-b31b1b.svg)
+[![](https://img.shields.io/pypi/v/sweights.svg)](https://pypi.org/project/sweights/)
+[![](https://readthedocs.org/projects/sweights/badge/?version=latest)](https://sweights.readthedocs.io/en/latest/)
+[![](https://img.shields.io/badge/arXiv-2112.04574-b31b1b.svg)](https://arxiv.org/abs/2112.04574)
 
 ```bash
 pip install sweights
