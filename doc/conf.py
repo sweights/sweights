@@ -21,7 +21,7 @@ from sweights import __version__
 # -- Project information -----------------------------------------------------
 
 project = "sweights"
-copyright = "2021, Matthew Kenzie"
+copyright = "2022, Matthew Kenzie"
 author = "Matthew Kenzie"
 
 # The full version, including alpha/beta/rc tags
