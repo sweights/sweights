@@ -42,3 +42,11 @@ if a != "" and a != "y" and a != "Y":
     sys.exit()
 
 os.system(upload_cmd)
+
+print(
+    """Currently you will need to git add, git commit,
+       git push and then on the github UI setup a new tag and
+       new release.
+       readthedocs will then update automatically
+    """
+)
