@@ -174,12 +174,43 @@ class SWeight:
         ]
 
         # check pdfs and write normalisation terms
+
+        # check pdfs is iterable
+        if not hasattr(pdfs, "__iter__"):
+            raise TypeError(
+                "The passed pdf list is not an iterable type. It should be a \
+                 list or tuple"
+            )
         self.pdfs = pdfs
+
+        # check if pdfs are callable
+        if method == "summation" or method == "integration":
+            for i, pdf in enumerate(self.pdfs):
+                if not callable(pdf):
+                    raise TypeError(f"The pdf passed at index {i} is not callable")
+
+        # check yields is iterable
+        if not hasattr(yields, "__iter__"):
+            raise TypeError(
+                "The passed yield list is not an iterable type. It should be a \
+                 list or tuple"
+            )
         self.yields = yields
+
+        # check yields length is the same as pdfs length
         if not (len(self.yields) == len(self.pdfs)):
             raise ValueError(
                 "The number of yields is not the same as the number of pdfs"
             )
+
+        # check yields are of the expected type
+        if method == "summation" or method == "integration":
+            for i, yld in enumerate(self.yields):
+                if not np.isscalar(yld):
+                    raise TypeError(
+                        f"The yield passed at index {i} is not of scalar type \
+                          (pass int or float type)"
+                    )
 
         self.ncomps = len(self.yields)
         if self.method != "roofit":
