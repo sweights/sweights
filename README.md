@@ -12,7 +12,7 @@ We provide several tools for projecting component weights ("sweights") in a cont
 
 Please cite as: 
 
-Dembinski, H., Kenzie, M., Langenbruch, C. and Schemlling, M., ``Custom Orthogonal Weight functions (COWs) for event classification", *NIMA* **1040** (2022) 167270
+Dembinski, H., Kenzie, M., Langenbruch, C. and Schmelling, M., ``Custom Orthogonal Weight functions (COWs) for event classification", *NIMA* **1040** (2022) 167270
 
 
 We also provide tools for correcting the covariance matrix of fits to weighted data. For details please see [Dembinski, Kenzie, Langenbruch, Schmelling - arXiv:2112.04574](https://arxiv.org/abs/2112.04574) (Sec IV) and [Langenbruch - arXiv:1911.01303](https://arxiv.org/abs/1911.01303).
