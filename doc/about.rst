@@ -1,6 +1,6 @@
 .. _about:
-.. _tutorial: tutorial.ipynb
-.. _converter: check_rf_conversion.ipynb
+.. _tutorial: notebooks/tutorial.ipynb
+.. _converter: notebooks/roopdf_conversion.ipynb
 .. toctree::
    :titlesonly:
 
@@ -19,3 +19,4 @@ Maintainers
 -----------
 
 * Matthew Kenzie (@matthewkenzie)
+* Hans Dembinski

@@ -25,7 +25,15 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-cov", "coverage[toml]", "iminuit >= 2", "matplotlib"]
-doc = ["ipython", "nbsphinx", "sphinx_rtd_theme"]
+doc = [
+    "ipython",
+    "nbsphinx",
+    "sphinx_rtd_theme",
+    "boost-histogram",
+    "matplotlib",
+    "uproot",
+    "pandas",
+]
 
 [project.urls]
 repositoy = "https://github.com/matthewkenzie/sweights"

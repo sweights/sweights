@@ -7,6 +7,8 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 from .util import import_optional_module, convert_rf_pdf
 from tempfile import NamedTemporaryFile
 
+__all__ = ["convert_rf_pdf", "SWeight"]
+
 
 class SWeight:
     """Produce sweights for a dataset given component pdfs."""
@@ -129,7 +131,7 @@ class SWeight:
             self.discvarranges = tuple((-np.inf, np.inf) for i in range(self.ndiscvars))
         if not (self.ndiscvars == len(self.discvarranges)):
             raise ValueError(
-                "You dont seemed to have passed sufficient ranges",
+                "You don't seemed to have passed sufficient ranges",
                 len(self.discvarranges),
                 "for the number of discriminant variables",
                 len(self.ndiscvars),

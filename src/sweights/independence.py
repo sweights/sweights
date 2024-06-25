@@ -31,15 +31,16 @@ def kendall_tau(x, y):
     -----
     `x` and `y` must have the same dimension.
     This function now uses `scipy.stats.kendalltau` for the coefficent
-    calcualtion (the uncertainty calculation is trivial) which makes a
+    calculation (the uncertainty calculation is trivial) which makes a
     few optimisations. See the scipy documentation for more information.
     """
     assert len(x) == len(y)
     err_approx = 1.0 / np.sqrt(len(x))
-    return (kendalltau(x, y).correlation, err_approx, kendalltau(x, y).pvalue)
+    result = kendalltau(x, y)
+    return (result.correlation, err_approx, result.pvalue)
 
 
-def plot_indep_scatter(x, y, reduction_factor=1, save=None, show=False):
+def plot_indep_scatter(x, y, reduction_factor=None, save=None, show=False):
     """
     Plot scatter of two variables.
 
@@ -49,24 +50,15 @@ def plot_indep_scatter(x, y, reduction_factor=1, save=None, show=False):
     plt = import_optional_module("matplotlib.pyplot")
 
     fig, ax = plt.subplots()
+    if reduction_factor is None:
+        max_points = 5000
+        if len(x) < max_points:
+            reduction_factor = 1
+        else:
+            reduction_factor = len(x) // max_points
     ax.scatter(x[::reduction_factor], y[::reduction_factor], s=1)
     tau, err, pval = kendall_tau(x, y)
-    ax.text(
-        0.7,
-        0.9,
-        f"$\\tau = {tau} \\pm {err}$",
-        transform=ax.transAxes,
-        backgroundcolor="w",
-    )
-    ax.text(
-        0.7,
-        0.8,
-        f"$p = {pval:.2f}$",
-        transform=ax.transAxes,
-        backgroundcolor="w",
-    )
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
+    ax.set_title(f"$\\tau = {tau:.3f} \\pm {err:.3f}$, p-value $= {pval:.2f}$")
     fig.tight_layout()
     if save:
         fig.savefig(save)
