@@ -8,3 +8,4 @@ src/sweights.egg-info
 build/
 doc/.ipynb_checkpoints/
 venv
+.vscode

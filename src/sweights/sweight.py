@@ -4,6 +4,10 @@ import numpy as np
 from scipy.integrate import nquad
 from scipy.linalg import solve
 from scipy.interpolate import InterpolatedUnivariateSpline
+from .util import import_optional_module, convert_rf_pdf
+from tempfile import NamedTemporaryFile
+
+__all__ = ["convert_rf_pdf", "SWeight"]
 
 
 class SWeight:
@@ -105,35 +109,6 @@ class SWeight:
                 self.allowed_methods,
             )
 
-        if self.method == "refit":
-            try:
-                import iminuit
-            except Exception:
-                raise RuntimeError(
-                    "To run with the 'refit' method iminuit must be installed"
-                )
-            if iminuit.version.version.split(".")[0] == "1":
-                raise RuntimeError("iminuit version must be > 2.x")
-
-        if self.method == "tsplot":
-            try:
-                import ROOT as r
-            except Exception:
-                raise RuntimeError("To run with 'tsplot method ROOT must be installed")
-            if int(r.__version__.split(".")[0]) < 6:
-                raise RuntimeError("ROOT version must be > 6.xx")
-
-        if self.method == "roofit":
-            try:
-                import ROOT as r
-            except Exception:
-                raise RuntimeError(
-                    """To run sweight with roofit method ROOT with RooFit must
-                    be installed"""
-                )
-            if int(r.__version__.split(".")[0]) < 6:
-                raise RuntimeError("ROOT version must be > 6.xx")
-
         self.verbose = verbose
         if self.verbose:
             print("Initialising sweight with the", self.method, "method:")
@@ -156,7 +131,7 @@ class SWeight:
             self.discvarranges = tuple((-np.inf, np.inf) for i in range(self.ndiscvars))
         if not (self.ndiscvars == len(self.discvarranges)):
             raise ValueError(
-                "You dont seemed to have passed sufficient ranges",
+                "You don't seemed to have passed sufficient ranges",
                 len(self.discvarranges),
                 "for the number of discriminant variables",
                 len(self.ndiscvars),
@@ -329,18 +304,18 @@ class SWeight:
         return nobs - nest
 
     def _solve_alphas(self):
-        if self.method in ["integration", "summation"]:
+        if self.method in ("integration", "summation"):
             sol = np.identity(len(self.Wkl))
             self.alphas = solve(self.Wkl, sol, assume_a="pos")
-        elif self.method in ["refit"]:
-            from iminuit import Minuit
+        elif self.method == "refit":
+            iminuit = import_optional_module("iminuit", min_version="2")
 
-            mi = Minuit(self._nll, tuple(self.yields))
-            mi.errordef = Minuit.LIKELIHOOD
+            mi = iminuit.Minuit(self._nll, tuple(self.yields))
+            mi.errordef = iminuit.Minuit.LIKELIHOOD
             mi.migrad()
             mi.hesse()
             self.alphas = np.array(mi.covariance.tolist())
-        elif self.method in ["tsplot", "roofit"]:
+        elif self.method in ("tsplot", "roofit"):
             self.alphas = np.identity(len(self.Wkl))
             return self.alphas
 
@@ -478,39 +453,29 @@ class SWeight:
             )
 
     def _run_tsplot(self):
+        assert self.method == "tsplot"
 
-        import ROOT as r
-
-        if self.method != "tsplot":
-            raise RuntimeError(
-                "Method is", self.method, "but calling the tsplot function."
-            )
+        R = import_optional_module("ROOT", min_version=6)
 
         # this works very differently for nD fits
         # so will not implement it here
         if self.ndiscvars != 1:
             raise RuntimeError("Sorry but I can't do the tsplot method for >1D fits")
 
-        # make the tree for TSPlot
+        R.gROOT.SetBatch()
+        tree = R.TTree("data", "data")
+        with NamedTemporaryFile(mode="rw", delete_on_close=False) as datfile:
+            for x in self.data:
+                datfile.write(f"{x[0]}")
+                for i, pdf in enumerate(self.pdfs):
+                    x_pdf = pdf(x[0]) / self.pdfnorms[i]
+                    datfile.write(f" {x_pdf}")
+                datfile.write("\n")
+            datfile.close()
+            read_str = "x/D:" + ":".join(["fx_%s" % a for a in self.compnames])
+            tree.ReadFile(".data.dat", read_str, " ")
 
-        # temporary datfile
-        datfile = open(".data.dat", "w")
-        for x in self.data:
-            datfile.write("{}".format(x[0]))
-            for i, pdf in enumerate(self.pdfs):
-                x_pdf = pdf(x[0]) / self.pdfnorms[i]
-                datfile.write(" {}".format(x_pdf))
-            datfile.write("\n")
-        datfile.close()
-
-        # now make the tree and draw some plots to check it
-        r.gROOT.SetBatch()
-
-        tree = r.TTree("data", "data")
-        read_str = "x/D:" + ":".join(["fx_%s" % a for a in self.compnames])
-
-        tree.ReadFile(".data.dat", read_str, " ")
-        c = r.TCanvas("c", "c", (self.ncomps + 1) * 600, 400)
+        c = R.TCanvas("c", "c", (self.ncomps + 1) * 600, 400)
         c.Divide(self.ncomps + 1, 1)
         c.cd(1)
         tree.Draw("x")
@@ -520,13 +485,12 @@ class SWeight:
         c.Update()
         c.Modified()
         c.Draw()
-        r.gErrorIgnoreLevel = r.kInfo
+        R.gErrorIgnoreLevel = R.kInfo
         c.Print("figs/tree.pdf")
 
-        # now do the TSPlot
         from array import array
 
-        tsplot = r.TSPlot(0, self.ndiscvars, len(self.data), self.ncomps, tree)
+        tsplot = R.TSPlot(0, self.ndiscvars, len(self.data), self.ncomps, tree)
         sel_str = "x:" + ":".join(["fx_%s" % a for a in self.compnames])
         tsplot.SetTreeSelection(sel_str)
         ne = array("i", [int(yld) for yld in self.yields])
@@ -543,19 +507,15 @@ class SWeight:
         return sorted_data_w_weights
 
     def _run_roofit(self):
+        assert self.method == "roofit"
 
-        import ROOT as r
+        R = import_optional_module("ROOT", min_version="6")
 
-        if self.method != "roofit":
-            raise RuntimeError(
-                "Method is", self.method, "but calling the roofit function."
-            )
-
-        r.RooMsgService.instance().setGlobalKillBelow(r.RooFit.FATAL)
-        r.gErrorIgnoreLevel = r.kInfo
+        R.RooMsgService.instance().setGlobalKillBelow(R.RooFit.FATAL)
+        R.gErrorIgnoreLevel = R.kInfo
 
         # sort out observables
-        rf_obs = r.RooArgList()
+        rf_obs = R.RooArgList()
         for obs in self.rfobs:
             if not obs.InheritsFrom("RooAbsReal"):
                 raise RuntimeError(
@@ -565,14 +525,14 @@ class SWeight:
             rf_obs.add(obs)
 
         # make the roodataset and fill it
-        rf_dset = r.RooDataSet("data", "data", r.RooArgSet(rf_obs))
+        rf_dset = R.RooDataSet("data", "data", R.RooArgSet(rf_obs))
         for row in self.data:
             for i in range(self.ndiscvars):
                 rf_obs.at(i).setVal(row[i])
-            rf_dset.add(r.RooArgSet(rf_obs))
+            rf_dset.add(R.RooArgSet(rf_obs))
 
         # pdfs should now be of the RooFit form
-        rf_pdfs = r.RooArgList()
+        rf_pdfs = R.RooArgList()
         for pdf in self.pdfs:
             if not pdf.InheritsFrom("RooAbsPdf"):
                 raise RuntimeError("Found a pdf which does not inherit from RooAbsPdf.")
@@ -581,7 +541,7 @@ class SWeight:
 
         # yields can still be numbers
         rfylds = [
-            r.RooRealVar(
+            R.RooRealVar(
                 "y_%s" % self.compnames[i],
                 "y_%s" % self.compnames[i],
                 yld,
@@ -590,31 +550,31 @@ class SWeight:
             )
             for i, yld in enumerate(self.yields)
         ]
-        rf_ylds = r.RooArgList()
+        rf_ylds = R.RooArgList()
         for yld in rfylds:
             rf_ylds.add(yld)
 
         # now can create the pdf
-        rf_totpdf = r.RooAddPdf("pdf", "pdf", rf_pdfs, rf_ylds, False)
+        rf_totpdf = R.RooAddPdf("pdf", "pdf", rf_pdfs, rf_ylds, False)
 
         # fit it (probably already been done)
-        rf_totpdf.fitTo(rf_dset, r.RooFit.Extended(True), r.RooFit.PrintLevel(-1))
+        rf_totpdf.fitTo(rf_dset, R.RooFit.Extended(True), R.RooFit.PrintLevel(-1))
 
         # plot it
-        c = r.TCanvas()
+        c = R.TCanvas()
         for obs in self.rfobs:
             pl = obs.frame()
-            rf_dset.plotOn(pl, r.RooFit.Binning(50))
+            rf_dset.plotOn(pl, R.RooFit.Binning(50))
             rf_totpdf.plotOn(pl)
             pl.Draw()
             c.Update()
             c.Modified()
             c.Draw()
-            r.gErrorIgnoreLevel = r.kInfo
+            R.gErrorIgnoreLevel = R.kInfo
             c.Print("figs/rf_%s.pdf" % obs.GetName())
 
         # now get the sweights using RooStats
-        r.RooStats.SPlot("sdata", "sdata", rf_dset, rf_totpdf, rf_ylds)
+        R.RooStats.SPlot("sdata", "sdata", rf_dset, rf_totpdf, rf_ylds)
 
         weights = np.zeros((rf_dset.numEntries(), self.ncomps))
 
@@ -629,75 +589,3 @@ class SWeight:
         sorted_data_w_weights = data_w_weights[np.argsort(data_w_weights[:, 0])]
 
         return sorted_data_w_weights
-
-
-def convert_rf_pdf(pdf, obs, npoints=400, forcenorm=False):
-    """
-    Convert RooAbsPdf into python callable.
-
-    Helper function to convert a RooFit::RooAbsPdf object into a python
-    callable that can be used by either the :class:`SWeight` or :class:`Cow`
-    classes
-
-    Parameters
-    ----------
-    pdf : RooAbsPdf
-        The pdf, must inherit from RooAbsPdf (e.g. RooGaussian, RooExponential,
-        RooAddPdf etc.)
-    obs : RooRealVar
-        The observable, must inherit from RooRealVarLValue but will usually be
-        a RooRealVar
-    npoints : int, optional
-        The number of points to use for the interpolation
-    forcenorm : bool, optional
-        Force the return function to be normalised by performing a numerical
-        integration of it (the function should in most cases be normalised
-        properly anyway so this shouldn't be needed)
-
-    Returns
-    -------
-    callable :
-        A callable function representing a normalised pdf which can then be
-        passed to the :class:`SWeight` or :class:`Cow` classes
-
-    """
-    try:
-        import ROOT as r
-    except Exception:
-        raise RuntimeError("ROOT and RooFit must be installed to convert a RooAbsPdf")
-
-    if not hasattr(obs, "InheritsFrom"):
-        raise RuntimeError(
-            """Observable does not appear to be a ROOT like object - it should
-            inherit from RooAbsReal. Type: """,
-            type(obs),
-        )
-
-    if not obs.InheritsFrom("RooAbsRealLValue"):
-        raise RuntimeError(
-            """Observable does not appear to be of the right type - it should
-            inherit from RooAbsRealLValue. Type: """,
-            type(obs),
-        )
-
-    range = (obs.getMin(), obs.getMax())
-
-    xvals = np.linspace(*range, npoints)
-
-    yvals = []
-
-    normset = r.RooArgSet(obs)
-    for x in xvals:
-        obs.setVal(x)
-        yvals.append(pdf.getVal(normset))
-
-    f = InterpolatedUnivariateSpline(xvals, yvals)
-
-    N = 1
-    if forcenorm:
-        N = nquad(f, (range,))[0]
-
-    def retf(x):
-        return f(x) / N
-
-    return retf
