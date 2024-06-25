@@ -7,3 +7,4 @@ src/sweights.egg-info
 **.swo
 build/
 doc/.ipynb_checkpoints/
+venv

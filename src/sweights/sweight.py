@@ -153,9 +153,7 @@ class SWeight:
         # sort out the disciminant variables integration ranges
         self.discvarranges = discvarranges
         if self.discvarranges is None:
-            self.discvarranges = tuple(
-                tuple(-np.inf, np.inf) for i in range(self.ndiscvars)
-            )
+            self.discvarranges = tuple((-np.inf, np.inf) for i in range(self.ndiscvars))
         if not (self.ndiscvars == len(self.discvarranges)):
             raise ValueError(
                 "You dont seemed to have passed sufficient ranges",

@@ -13,7 +13,7 @@ from iminuit.pdg_format import pdg_format
 import boost_histogram as bh
 
 ## from this code
-from sweights import sweight, cow, cov_correct, approx_cov_correct, kendall_tau
+from sweights import SWeight, Cow, cov_correct, approx_cov_correct, kendall_tau
 
 # make a toy model
 
@@ -32,6 +32,7 @@ mpars = [mu, sg, lb]
 trange = (0, 1)
 tlb = 2
 tpars = [tlb]
+
 
 # generate the toy
 def generate(Ns, Nb, mu, sg, lb, tlb, poisson=False, ret_true=False):
@@ -118,7 +119,7 @@ def myerrorbar(data, ax, bins, range, wts=None, label=None, col=None):
     col = col or "k"
     nh, xe = np.histogram(data, bins=bins, range=range)
     cx = 0.5 * (xe[1:] + xe[:-1])
-    err = nh ** 0.5
+    err = nh**0.5
     if wts is not None:
         whist = bh.Histogram(bh.axis.Regular(bins, *range), storage=bh.storage.Weight())
         whist.fill(data, weight=wts)
@@ -274,7 +275,7 @@ if __name__ == "__main__":
 
     # make the sweighter
     print("Compute sweights")
-    sweighter = sweight(
+    sweighter = SWeight(
         toy[:, 0],
         [spdf, bpdf],
         [mi.values["Ns"], mi.values["Nb"]],
@@ -292,7 +293,7 @@ if __name__ == "__main__":
 
     # make the cow
     print("Compute cow weights")
-    cw = cow(mrange, spdf, gb, Im, verbose=args.verbose)
+    cw = Cow(mrange, spdf, gb, Im, verbose=args.verbose)
 
     # compare the two
     flbs = []
@@ -300,13 +301,13 @@ if __name__ == "__main__":
 
         # plot weights
         x = np.linspace(*mrange, 400)
-        swp = cls.getWeight(0, x)
-        bwp = cls.getWeight(1, x)
+        swp = cls.get_weight(0, x)
+        bwp = cls.get_weight(1, x)
         if args.makeplots:
             plot_wts(x, swp, bwp, save=f"{args.plotdir}/{meth}_wts.png")
 
         # fit weighted data
-        wts = cls.getWeight(0, toy[:, 0])
+        wts = cls.get_weight(0, toy[:, 0])
         nll = lambda tlb: wnll(tlb, toy[:, 1], wts)
 
         # do the minimisation
@@ -328,7 +329,7 @@ if __name__ == "__main__":
 
         # second order correction
         hs = tpdf_cor
-        ws = lambda m: cls.getWeight(0, m)
+        ws = lambda m: cls.get_weight(0, m)
         W = cls.Wkl
 
         # these derivatives can be done numerically but for the sweights / COW case it's straightfoward to compute them
@@ -341,7 +342,7 @@ if __name__ == "__main__":
             / (-Wss * gb + Wsb * gs + Wsb * gb - Wbb * gs) ** 2
         )
         dws_Wsb = (
-            lambda Wss, Wsb, Wbb, gs, gb: (Wbb * gs ** 2 - Wss * gb ** 2)
+            lambda Wss, Wsb, Wbb, gs, gb: (Wbb * gs**2 - Wss * gb**2)
             / (Wss * gb - Wsb * gs - Wsb * gb + Wbb * gs) ** 2
         )
         dws_Wbb = (
@@ -374,8 +375,8 @@ if __name__ == "__main__":
     ## plot weight T distribution
     swf = lambda t: tpdf(t, mi.values["Ns"], 0, flbs[0], comps=["sig"])
     cowf = lambda t: tpdf(t, mi.values["Ns"], 0, flbs[1], comps=["sig"])
-    sws = sweighter.getWeight(0, toy[:, 0])
-    scow = cw.getWeight(0, toy[:, 0])
+    sws = sweighter.get_weight(0, toy[:, 0])
+    scow = cw.get_weight(0, toy[:, 0])
 
     if args.makeplots:
         plot_tweighted(
