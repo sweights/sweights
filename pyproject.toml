@@ -1,6 +1,36 @@
 [build-system]
-requires = [
-    "setuptools>=42",
-    "wheel"
-]
+requires = ["setuptools >= 60", "setuptools_scm[toml] >= 8.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "sweights"
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.20.1", "scipy>=1.5.1"]
+authors = [
+    { name = "Matthew Kenzie", email = "matthew.kenzie@cern.ch" },
+    { name = "Hans Dembinski", email = "hans.dembinski@gmail.com" },
+]
+description = "Tools for producing sweights using classic methods or custom orthogonal weight functions (COWs) and for correcting covariance matrices for weighted data fits."
+readme = "README.md"
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    'Programming Language :: Python :: 3 :: Only',
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    'Intended Audience :: Science/Research',
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov", "coverage[toml]", "iminuit >= 2", "matplotlib"]
+doc = ["ipython", "nbsphinx", "sphinx_rtd_theme"]
+
+[project.urls]
+repositoy = "https://github.com/matthewkenzie/sweights"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools_scm]
