@@ -42,3 +42,30 @@ repositoy = "https://github.com/matthewkenzie/sweights"
 where = ["src"]
 
 [tool.setuptools_scm]
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.ruff]
+extend-select = ["E", "F", "W", "D"]
+ignore = ["D212", "D203"]
+unfixable = ["ERA"]
+
+[tool.ruff.per-file-ignores]
+"test_*.py" = ["D"]
+
+[tool.mypy]
+strict = true
+no_implicit_optional = false
+allow_redefinition = true
+ignore_missing_imports = true
+show_error_codes = true
+files = "src/resample/*.py"
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules --strict-config --strict-markers -q -ra --ff"
+testpaths = ["src/resample", "tests"]
+log_cli_level = "INFO"
+xfail_strict = true
+filterwarnings = ["error::DeprecationWarning", "error::FutureWarning"]
