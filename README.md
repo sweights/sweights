@@ -8,15 +8,14 @@
 pip install sweights
 ```
 
-We provide several tools for projecting component weights ("sweights") in a control variable(s) using a discriminating variable(s), this includes using the traditional `sPlot` method and also Custom Orthogonal Weight functions (COWs). For details of these please see [Dembinski, Kenzie, Langenbruch, Schmelling - arXiv:2112.04574](https://arxiv.org/abs/2112.04574) - published as [NIM A **1040** (2022) 167270](https://www.sciencedirect.com/science/article/pii/S0168900222006076?via%3Dihub).
+We provide several tools for projecting component weights *sWeights* in a control variable(s) using a discriminating variable(s). What we call *sWeights* is the traditional *sPlot* method (we think that sPlot is a misnomer and hence call it sWeights), but also the new Custom Orthogonal Weight functions (COWs). If you use this package, please cite our methods as:
 
-Please cite as: 
+[Dembinski, H., Kenzie, M., Langenbruch, C. and Schmelling, M., ``Custom Orthogonal Weight functions (COWs) for event classification", *NIMA* **1040** (2022) 167270](https://www.sciencedirect.com/science/article/pii/S0168900222006076?via%3Dihub)
 
-Dembinski, H., Kenzie, M., Langenbruch, C. and Schmelling, M., ``Custom Orthogonal Weight functions (COWs) for event classification", *NIMA* **1040** (2022) 167270
+If you cannot access this paper for free, checkout the preprint, [arXiv:2112.04574](https://arxiv.org/abs/2112.04574).
 
-
-We also provide tools for correcting the covariance matrix of fits to weighted data. For details please see [Dembinski, Kenzie, Langenbruch, Schmelling - arXiv:2112.04574](https://arxiv.org/abs/2112.04574) (Sec IV) and [Langenbruch - arXiv:1911.01303](https://arxiv.org/abs/1911.01303).
+We also provide tools for correcting the covariance matrix of fits to weighted data, described in section IV of our paper and in more detail in [Langenbruch, arXiv:1911.01303](https://arxiv.org/abs/1911.01303).
 
 ## Documentation
 
-Please head over to [sweights.readthedocs.io](https://sweights.readthedocs.io) for the latest documentation.
+You can find [our documentation here](https://sweights.github.io/sweights).
