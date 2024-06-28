@@ -10,3 +10,4 @@ doc/.ipynb_checkpoints/
 venv
 .vscode
 .pytest_cache
+outf.root

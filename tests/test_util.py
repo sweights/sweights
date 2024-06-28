@@ -4,14 +4,22 @@ from numpy.testing import assert_allclose
 from sweights import util
 
 
-def test_convert_rf_pdf():
+@pytest.mark.parametrize(
+    "kwargs",
+    (
+        {"npoints": None},
+        {"npoints": 1000},
+        {"npoints": 1000, "method": "pchip"},
+    ),
+)
+def test_convert_rf_pdf(kwargs):
     R = pytest.importorskip("ROOT")
 
     mass = R.RooRealVar("m", "m", 0, 3)
 
     slope = R.RooRealVar("lb", "lb", 0, 2, 1)
     pdf1 = R.RooExponential("bkg", "bkg", mass, slope)
-    pdf2 = util.convert_rf_pdf(pdf1, mass)
+    pdf2 = util.convert_rf_pdf(pdf1, mass, **kwargs)
 
     x = np.linspace(mass.getMin(), mass.getMax())
 
