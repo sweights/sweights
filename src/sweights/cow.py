@@ -3,8 +3,8 @@
 from scipy.integrate import quad
 from scipy import linalg
 import numpy as np
-from typing import Union, Tuple, Optional, Sequence, List
-from .typing import Density, FloatArray
+from typing import Union, Tuple, Optional, Sequence, List, Any
+from .typing import Density, FloatArray, Range
 from .util import normalized, pdf_from_histogram
 import warnings
 
@@ -14,22 +14,21 @@ __all__ = ["Cow"]
 class Cow:
     """Produce weights using COWs."""
 
-    mrange: Tuple[float, float]
+    mrange: Range
     Im: Density
     gk: List[Density]
     Akl: FloatArray
-    obs: Optional[Tuple[FloatArray, FloatArray]]
     renorm: bool
 
     def __init__(
         self,
-        mrange: Tuple[float, float],
+        mrange: Range,
         gs: Density,
         gb: Union[Density, Sequence[Density]],
-        Im: Optional[Union[int, Density]] = None,
-        obs: Optional[Tuple[FloatArray, FloatArray]] = None,
+        Im: Optional[Union[int, Density, Tuple[FloatArray, FloatArray]]] = None,
         renorm: bool = True,
-        verbose: bool = True,
+        verbose: bool = False,
+        **deprecated: Any,
     ):
         """
         Initialize Cow object.
@@ -49,20 +48,20 @@ class Cow:
             Background PDF in the discriminant variable. Each must accept an
             array-like argument and return an array. This can also be a sequence of
             PDFs that comprise the background.
-        Im : callable or None, optional
+        Im : callable or tuple(array-like, array-like) or None, optional
             The "variance function" in the COWs formula. An arbitrary density normalized
             over the integration range. If a callable is provided, it must accept an
-            array-like argument and return an array. If this argument is None, a
-            constant density is used (the default).
-        obs : tuple(array-like, array-like), optional
-            You can instead pass the observed distribution to evaluate Im
-            instead. This expects the entries and bin edges in a two element
-            tuple like the return value of np.histogram.
+            array-like argument and return an array. If a tuple is provide, it must
+            consist of two array, entries and bin edges of a histogram over the
+            distriminant variable, in other words, the output of numpy.histogram. If
+            this argument is None, a constant density is used (the default).
         renorm : bool, optional
             Renormalise passed functions to unity (you can override this if you
             already know it's true).
         verbose : bool, optional
             If True, produce extra output for debugging.
+        **deprecated :
+            Deprecated arguments, which will raise a warning when used.
 
         Notes
         -----
@@ -74,6 +73,12 @@ class Cow:
         get_weight
 
         """
+        DEPRECATED = {"obs"}
+        unknown = set(deprecated) - DEPRECATED
+        if unknown:
+            msg = f"unknown arguments: {unknown}"
+            raise KeyError(msg)
+
         self.renorm = renorm
         self.mrange = mrange
 
@@ -91,32 +96,20 @@ class Cow:
         gbarg = [gb] if not isinstance(gb, Sequence) else gb
         self.gb = [normed(g) for g in gbarg]
         self.gk = [self.gs] + self.gb
+
+        xe = np.array(mrange)
         if Im is None or isinstance(Im, int):
             if isinstance(Im, int):
                 msg = "Passing Im=1 is deprecated, use Im=None instead"
                 warnings.warn(msg, FutureWarning)
             self.Im: Density = lambda m: np.ones_like(m) / (mrange[1] - mrange[0])
+        elif isinstance(Im, Sequence) or "obs" in deprecated:
+            Im = deprecated.get("obs", Im)
+            assert isinstance(Im, Sequence)
+            xe = Im[1]
+            self.Im = _process_histogram_argument(Im, mrange)
         else:
             self.Im = normed(Im)
-        self.obs = obs
-
-        xe = np.array(mrange)
-        if obs:
-            try:
-                w, xe = obs
-            except IndexError:
-                raise ValueError(
-                    "The observation must be passed as length two object "
-                    "containing weights and bin edges (w, xe) - ie. what is "
-                    "returned by numpy.histogram()"
-                )
-            if len(w) != len(xe) - 1:
-                msg = "The counts and bin edges do not have the right lengths."
-                raise ValueError(msg)
-            if xe[0] != mrange[0] or xe[-1] != mrange[1]:
-                msg = "Histogram range does not match mrange"
-                raise ValueError(mrange)
-            self.Im = pdf_from_histogram(w, xe)
 
         if verbose:
             print("Initialising COW:")
@@ -173,6 +166,25 @@ class Cow:
 
     # alias for get_weight
     wk = get_weight
+
+
+def _process_histogram_argument(
+    arg: Tuple[FloatArray, FloatArray], mrange: Range
+) -> Density:
+    try:
+        w, xe = arg
+    except ValueError as e:
+        e.args = (
+            f"{e.args[0]} (histogram must be tuple of weights and bin edges, (w, xe))",
+        )
+        raise
+    if len(w) != len(xe) - 1:
+        msg = "counts and bin edges do not have the right lengths"
+        raise ValueError(msg)
+    if xe[0] != mrange[0] or xe[-1] != mrange[1]:
+        msg = "histogram range does not match mrange"
+        raise ValueError(mrange)
+    return pdf_from_histogram(w, xe)
 
 
 def _compute_W(

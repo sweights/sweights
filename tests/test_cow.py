@@ -3,10 +3,12 @@ from sweights.cow import Cow
 from scipy.stats import norm, expon
 from scipy.optimize import minimize
 import numpy as np
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_equal
+import pytest
 
 
-def test_cow():
+@pytest.mark.parametrize("Im_kind", ("const", "g(m)", "hist"))
+def test_cow(Im_kind):
     s = 10000
     b = 10000
     mrange = (0, 1)
@@ -42,9 +44,21 @@ def test_cow():
         dnorm = np.diff(d.cdf(mrange))
         return d.pdf(m) / dnorm
 
-    cow = Cow(mrange, gs, gb, 1)
+    if Im_kind == "const":
+        Im = None
+    elif Im_kind == "g(m)":
+
+        def Im(m):
+            return (gs(m) + gb(m)) / 2
+
+    else:
+        Im = np.histogram(m, range=mrange)
+
+    cow = Cow(mrange, gs, gb, Im=Im)
 
     w = cow.get_weight(0, m)
+
+    assert_equal(cow(m), w)
 
     def wnll(par):
         d = expon(0, *par)

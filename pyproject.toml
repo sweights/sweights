@@ -60,10 +60,8 @@ unfixable = ["ERA"]
 plugins = "numpy.typing.mypy_plugin"
 strict = true
 exclude = "test_.*\\.py$"
-no_implicit_optional = false
 allow_redefinition = true
 ignore_missing_imports = true
-show_error_codes = true
 
 [[tool.mypy.overrides]]
 module = ["sweights.covariance", "sweights.sweight", "sweights.independence"]
