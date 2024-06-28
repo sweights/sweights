@@ -7,9 +7,10 @@ from sweights import util
 @pytest.mark.parametrize(
     "kwargs",
     (
-        {"npoints": None},
+        {"npoints": 0},
         {"npoints": 1000},
         {"npoints": 1000, "method": "pchip"},
+        {"npoints": 100, "forcenorm": True},
     ),
 )
 def test_convert_rf_pdf(kwargs):
@@ -30,4 +31,4 @@ def test_convert_rf_pdf(kwargs):
 
     y2 = pdf2(x)
 
-    assert_allclose(y1, y2)
+    assert_allclose(y1, y2, atol=1e-5 if kwargs["npoints"] > 0 else 1e-10)

@@ -1,10 +1,11 @@
 """Various utilities used by the package or in the tutorials."""
 
 from packaging.version import Version
-from typing import Any, Optional
+from typing import Any
 import numpy as np
 from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from scipy.integrate import quad
+import warnings
 
 RooAbsPdf = Any
 RooAbsReal = Any
@@ -49,7 +50,7 @@ def convert_rf_pdf(
     *,
     npoints: int = 0,
     method: str = "makima",
-    forcenorm: bool = False,
+    forcenorm: bool = True,
 ):
     """
     Convert a RooFit RooAbsPdf into a vectorized Python callable.
@@ -64,19 +65,20 @@ def convert_rf_pdf(
         RooAddPdf etc.)
     obs : RooAbsReal
         The observable.
-    npoints: int or None, optional (default is None)
-        If npoints is not None, a spline interpolator is used to approximate the RooFit
-        PDF. The spline is constructed from the given number of points, which are
-        equally spaced over the range of ``obs``, which must be a bounded
-        variable. Otherwise a wrapper around the RooFit PDF is returned. The spline
-        interpolator is an approximation, but fast to compute. The wrapper is exact, but
-        may be slower to evaluate.
+    npoints: int, optional (default is 0)
+        If npoints is zero, a wrapper around the RooFit PDF is returned. This wrapper
+        internally calls the RooFit PDF and therefore produces exact results. If npoints
+        is larger than zero, a spline interpolator is constructed instead to approximate
+        the RooFit PDF. It is constructed by evaluating the exact PDF at the given
+        number of points, which are equally spaced over the range of ``obs``, which must
+        be a bounded variable.  The spline is an approximation, but faster to compute.
     method: str, optional (default is "makima")
         Interpolation method to use. Accepted values are "makima" and "pchip".
-    forcenorm : bool, optional
-        Force the return function to be normalised by performing a numerical
-        integration of it (the function should in most cases be normalised
-        properly anyway so this shouldn't be needed)
+    forcenorm : bool, optional (default is True)
+        This only has an effect, if an interpolator is returned. Since the interpolator
+        is not normalized in general, we need to normalize it. Setting this to False
+        skips the computation of the integral, which is done numerically. Deactivate
+        this only if the numerical interaction fails for some reason.
 
     Returns
     -------
@@ -91,29 +93,7 @@ def convert_rf_pdf(
 
     range = (obs.getMin(), obs.getMax())
 
-    if npoints is None:
-        wrapper = getattr(R, "RooAbsPdfPythonWrapper", None)
-        if wrapper is None:
-            R.gInterpreter.Declare(
-                """std::vector<double> RooAbsPdfPythonWrapper(
-                    const std::vector<double>& x, RooAbsPdf* pdf, RooRealVar* obs) {{
-            std::vector<double> result;
-            result.reserve(x.size());
-            RooArgSet nset(*obs);
-            for (const auto& xi : x) {{
-                obs->setVal(xi);
-                result.push_back(pdf->getVal(nset));
-            }}
-            return result;
-}}"""
-            )
-            wrapper = getattr(R, "RooAbsPdfPythonWrapper")
-
-        def fn(x):
-            r = wrapper(x, pdf, obs)
-            return np.array(r)
-
-    else:
+    if npoints > 0:
         x = np.linspace(*range, npoints)
         y = []
 
@@ -134,13 +114,38 @@ def convert_rf_pdf(
             )
             raise ValueError(msg)
 
-    if forcenorm:
-        norm = quad(fn, *range)[0]
+        if forcenorm:
+            with warnings.catch_warnings():
+                # ignore accuracy warnings from quad
+                warnings.simplefilter("ignore")
+                norm = quad(fn, *range)[0]
 
-        fn_orig = fn
+            fn_orig = fn
+
+            def fn(x):
+                return fn_orig(x) / norm
+
+    else:
+        wrapper = getattr(R, "RooAbsPdfPythonWrapper", None)
+        if wrapper is None:
+            R.gInterpreter.Declare(
+                """std::vector<double> RooAbsPdfPythonWrapper(
+                    const std::vector<double>& x, RooAbsPdf* pdf, RooRealVar* obs) {{
+            std::vector<double> result;
+            result.reserve(x.size());
+            RooArgSet nset(*obs);
+            for (const auto& xi : x) {{
+                obs->setVal(xi);
+                result.push_back(pdf->getVal(nset));
+            }}
+            return result;
+}}"""
+            )
+            wrapper = getattr(R, "RooAbsPdfPythonWrapper")
 
         def fn(x):
-            return fn_orig(x) / norm
+            r = wrapper(x, pdf, obs)
+            return np.array(r)
 
     return fn
 
