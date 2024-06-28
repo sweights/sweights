@@ -57,6 +57,7 @@ def approx_cov_correct(pdf, data, wts, fvals, fcov, verbose=False):
     See Also
     --------
     cov_correct
+
     """
     dim = len(fvals)
     assert fcov.shape[0] == dim and fcov.shape[1] == dim
@@ -70,7 +71,7 @@ def approx_cov_correct(pdf, data, wts, fvals, fcov, verbose=False):
         for k in range(dim):
             derivk = _partial_derivative(pdf, k, fvals, data)
 
-            Djk[j, k] = np.sum(wts ** 2 * (derivj * derivk) / prob ** 2)
+            Djk[j, k] = np.sum(wts**2 * (derivj * derivk) / prob**2)
 
     corr_cov = fcov * Djk * fcov.T
 
@@ -167,11 +168,7 @@ def cov_correct(
     for i, gis in enumerate(Citer):
         for j, gjs in enumerate(Citer):
             Ckl[i, j] = np.sum(
-                gis[0](gdata)
-                * gis[1](gdata)
-                * gjs[0](gdata)
-                * gjs[1](gdata)
-                / gtot ** 4
+                gis[0](gdata) * gis[1](gdata) * gjs[0](gdata) * gjs[1](gdata) / gtot**4
             )
 
     HECEH_term = fcov @ (Ekl @ Ckl @ Ekl.T) @ fcov.T

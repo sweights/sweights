@@ -33,6 +33,7 @@ def kendall_tau(x, y):
     This function now uses `scipy.stats.kendalltau` for the coefficent
     calculation (the uncertainty calculation is trivial) which makes a
     few optimisations. See the scipy documentation for more information.
+
     """
     assert len(x) == len(y)
     err_approx = 1.0 / np.sqrt(len(x))

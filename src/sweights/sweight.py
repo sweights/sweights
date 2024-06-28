@@ -92,6 +92,7 @@ class SWeight:
         See Also
         --------
         get_weight, make_weight_plot
+
         """
         self.allowed_methods = [
             "summation",
@@ -344,6 +345,7 @@ class SWeight:
         -------
         ndarray
             An array of the weights
+
         """
         if self.method == "tsplot":
             return self.tsplotw[icomp](*args)
@@ -377,6 +379,7 @@ class SWeight:
         labels : list of str
             List of legend labels. Default will use those passed in `compnames`
             with `__init__`
+
         """
         if self.ndiscvars != 1:
             print("WARNING - I dont know how to plot this")

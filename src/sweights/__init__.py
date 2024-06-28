@@ -12,9 +12,10 @@ __all__ = [
 ]
 
 from importlib.metadata import version
-from sweights.sweight import SWeight, convert_rf_pdf
-from sweights.cow import Cow
-from sweights.independence import kendall_tau, plot_indep_scatter
-from sweights.covariance import cov_correct, approx_cov_correct
+from .sweight import SWeight
+from .cow import Cow
+from .independence import kendall_tau, plot_indep_scatter
+from .covariance import cov_correct, approx_cov_correct
+from .util import convert_rf_pdf
 
 __version__ = version("sweights")

@@ -1,17 +1,24 @@
 """Various utilities used by the package or in the tutorials."""
 
 from packaging.version import Version
-from typing import Any
 import numpy as np
 from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from scipy.integrate import quad
 import warnings
+from typing import Tuple, Optional, Union, Any, TYPE_CHECKING
+from .typing import RooAbsPdf, RooRealVar, Density, FloatArray
+from numpy.typing import ArrayLike
 
-RooAbsPdf = Any
-RooAbsReal = Any
+__all__ = [
+    "import_optional_module",
+    "convert_rf_pdf",
+    "plot_binned",
+    "normalized",
+    "pdf_from_histogram",
+]
 
 
-def import_optional_module(name: str, *, min_version: str = ""):
+def import_optional_module(name: str, *, min_version: str = "") -> Any:
     """
     Import an optional dependency.
 
@@ -46,12 +53,12 @@ def import_optional_module(name: str, *, min_version: str = ""):
 
 def convert_rf_pdf(
     pdf: RooAbsPdf,
-    obs: RooAbsReal,
+    obs: RooRealVar,
     *,
     npoints: int = 0,
     method: str = "makima",
     forcenorm: bool = True,
-):
+) -> Density:
     """
     Convert a RooFit RooAbsPdf into a vectorized Python callable.
 
@@ -63,7 +70,7 @@ def convert_rf_pdf(
     pdf : RooAbsPdf
         The pdf, must inherit from RooAbsPdf (e.g. RooGaussian, RooExponential,
         RooAddPdf etc.)
-    obs : RooAbsReal
+    obs : RooRealVar
         The observable.
     npoints: int, optional (default is 0)
         If npoints is zero, a wrapper around the RooFit PDF is returned. This wrapper
@@ -103,6 +110,7 @@ def convert_rf_pdf(
 
         # We only allow makima and pchip interpolators, because these do not overshoot.
         # This guarantees that the interpolators do not return negative values.
+        fn: Density
         if method == "makima":
             fn = Akima1DInterpolator(x, y, method="makima")
         elif method == "pchip":
@@ -116,14 +124,9 @@ def convert_rf_pdf(
 
         if forcenorm:
             with warnings.catch_warnings():
-                # ignore accuracy warnings from quad
+                # ignore accuracy warnings from integration
                 warnings.simplefilter("ignore")
-                norm = quad(fn, *range)[0]
-
-            fn_orig = fn
-
-            def fn(x):
-                return fn_orig(x) / norm
+                return normalized(fn, range)
 
     else:
         wrapper = getattr(R, "RooAbsPdfPythonWrapper", None)
@@ -143,14 +146,21 @@ def convert_rf_pdf(
             )
             wrapper = getattr(R, "RooAbsPdfPythonWrapper")
 
-        def fn(x):
+        def fn(x: FloatArray) -> FloatArray:
             r = wrapper(x, pdf, obs)
             return np.array(r)
 
     return fn
 
 
-def plot_binned(data, *, bins=None, range=None, weights=None, **kwargs):
+def plot_binned(
+    data: ArrayLike,
+    *,
+    bins: Optional[Union[int, FloatArray]] = None,
+    range: Optional[Tuple[float, float]] = None,
+    weights: Optional[ArrayLike] = None,
+    **kwargs: Any,
+) -> Tuple[FloatArray, FloatArray, FloatArray]:
     """
     Plot histogram from data.
 
@@ -168,13 +178,17 @@ def plot_binned(data, *, bins=None, range=None, weights=None, **kwargs):
         Axes to plot on. If None, then use matplotlib.pyplot.gca().
     **kwargs:
         Further arguments are forwarded to matplotlib.pyplot.errorbar.
+
     """
+    if TYPE_CHECKING:
+        # workaround for buggy histogram annotations
+        assert bins is not None
     if weights is None:
         val, xe = np.histogram(data, bins=bins, range=range)
         err = val**0.5
     else:
         wsum, xe = np.histogram(data, bins=bins, range=range, weights=weights)
-        w2sum = np.histogram(data, bins=xe, weights=weights**2)[0]
+        w2sum = np.histogram(data, bins=xe, weights=np.asarray(weights) ** 2)[0]
         val = wsum
         err = np.sqrt(w2sum)
     cx = 0.5 * (xe[1:] + xe[:-1])
@@ -184,3 +198,28 @@ def plot_binned(data, *, bins=None, range=None, weights=None, **kwargs):
         kwargs["fmt"] = "o"
     plt = import_optional_module("matplotlib.pyplot")
     plt.errorbar(cx, val, err, **kwargs)
+    return val, err, xe
+
+
+def normalized(fn: Density, range: Tuple[float, float]) -> Density:
+    """Return a function normalized over the given range."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        fnorm = quad(fn, *range)[0]
+    return lambda x: fn(x) / fnorm
+
+
+def pdf_from_histogram(w: FloatArray, xe: FloatArray) -> Density:
+    """Return a pdf (piecewise constant) constructe from a histogram."""
+    w = w / np.sum(w)  # sum of wts now 1
+    # divide by bin width to get a function which integrates to 1
+    w *= len(w) / (xe[-1] - xe[0])
+
+    def fn(x: FloatArray) -> FloatArray:
+        r = np.zeros_like(x)
+        ind = np.searchsorted(xe, x, side="right") - 1
+        mask = (0 <= ind) & (ind < len(xe) - 1)
+        r[mask] = w[ind[mask]]
+        return r
+
+    return fn

@@ -15,7 +15,7 @@ To install the latest stable version from PyPI with ``pip``:
 Conda
 -----
 
-Not yet available, but you can safely install with pip into your existing conda environment. 
+Not yet available, but you can safely install with pip into your existing conda environment.
 
 Installing from source
 ----------------------

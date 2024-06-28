@@ -1,12 +1,8 @@
 """Toy distributions to use in examples."""
 
 import numpy as np
-from typing import Tuple, Any
-
-try:
-    from numpy.typing import Array
-except ImportError:
-    Array = Any
+from typing import Tuple
+from numpy.typing import NDArray
 from scipy.stats import norm, expon
 
 
@@ -24,7 +20,7 @@ def make_classic_toy(
     tb_mu: float = 0.1,
     tb_sigma: float = 0.1,
     random_sample_size: bool = True,
-) -> Tuple[Array, Array, Array]:
+) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """
     Generate a toy distribution to test the sweights and cows.
 
@@ -69,6 +65,7 @@ def make_classic_toy(
     random_sample_size: bool, optional
         If True, the yields are fluctuated around the given values according to the
         Poisson distribution.
+
     """
     rng = np.random.default_rng(seed)
 
@@ -76,27 +73,27 @@ def make_classic_toy(
     n_bkg = rng.poisson(b) if random_sample_size else int(b)
 
     dms = norm(ms_mu, ms_sigma)
-    dmb = expon(mrange[0], mb_mu)
+    dmb = expon(0, mb_mu)
 
-    m_s = dms.ppf(rng.uniform(*dms.cdf(mrange), size=n_sig))
-    m_b = dmb.ppf(rng.uniform(*dmb.cdf(mrange), size=n_bkg))
+    m_s = dms.ppf(rng.uniform(*dms.cdf(mrange), size=n_sig))  # type:ignore
+    m_b = dmb.ppf(rng.uniform(*dmb.cdf(mrange), size=n_bkg))  # type:ignore
 
     m = np.append(m_s, m_b)
 
-    dts = expon(trange[0], ts_mu)
+    dts = expon(0, ts_mu)
     dtb = norm(tb_mu, tb_sigma)
 
-    t_s = dts.ppf(rng.uniform(*dts.cdf(trange), size=n_sig))
-    t_b = dtb.ppf(rng.uniform(*dtb.cdf(trange), size=n_bkg))
+    t_s = dts.ppf(rng.uniform(*dts.cdf(trange), size=n_sig))  # type:ignore
+    t_b = dtb.ppf(rng.uniform(*dtb.cdf(trange), size=n_bkg))  # type:ignore
 
     t = np.append(t_s, t_b)
 
-    truth_mask = np.zeros(len(m), dtype=bool)
-    truth_mask[: len(m_s)] = 1
+    sigmask = np.zeros(len(m), dtype=bool)
+    sigmask[: len(m_s)] = 1
 
     perm = rng.permutation(np.arange(len(m)))
     m = m[perm]
     t = t[perm]
-    truth_mask = truth_mask[perm]
+    sigmask = sigmask[perm]
 
-    return m, t, truth_mask
+    return m, t, sigmask

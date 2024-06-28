@@ -47,25 +47,31 @@ where = ["src"]
 profile = "black"
 multi_line_output = 3
 
-[tool.ruff]
+[tool.ruff.lint]
 extend-select = ["E", "F", "W", "D"]
 ignore = ["D212", "D203"]
 unfixable = ["ERA"]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "test_*.py" = ["D"]
+"doc/conf.py" = ["D"]
 
 [tool.mypy]
+plugins = "numpy.typing.mypy_plugin"
 strict = true
+exclude = "test_.*\\.py$"
 no_implicit_optional = false
 allow_redefinition = true
 ignore_missing_imports = true
 show_error_codes = true
-files = "src/resample/*.py"
+
+[[tool.mypy.overrides]]
+module = ["sweights.covariance", "sweights.sweight", "sweights.independence"]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 addopts = "--doctest-modules --strict-config --strict-markers -q -ra --ff"
-testpaths = ["src/resample", "tests"]
+testpaths = ["src/sweights", "tests"]
 log_cli_level = "INFO"
 xfail_strict = true
 filterwarnings = ["error::DeprecationWarning", "error::FutureWarning"]

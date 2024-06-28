@@ -1,15 +1,36 @@
 """Implementation of the COW class."""
 
-from scipy.stats import uniform
 from scipy.integrate import quad
 from scipy import linalg
 import numpy as np
+from typing import Union, Tuple, Optional, Sequence, List
+from .typing import Density, FloatArray
+from .util import normalized, pdf_from_histogram
+import warnings
+
+__all__ = ["Cow"]
 
 
 class Cow:
     """Produce weights using COWs."""
 
-    def __init__(self, mrange, gs, gb, Im=1, obs=None, renorm=True, verbose=True):
+    mrange: Tuple[float, float]
+    Im: Density
+    gk: List[Density]
+    Akl: FloatArray
+    obs: Optional[Tuple[FloatArray, FloatArray]]
+    renorm: bool
+
+    def __init__(
+        self,
+        mrange: Tuple[float, float],
+        gs: Density,
+        gb: Union[Density, Sequence[Density]],
+        Im: Union[int, Density] = 1,
+        obs: Optional[Tuple[FloatArray, FloatArray]] = None,
+        renorm: bool = True,
+        verbose: bool = True,
+    ):
         """
         Initialize Cow object.
 
@@ -19,28 +40,30 @@ class Cow:
 
         Parameters
         ----------
-        mrange : tuple
-            A two element tuple for the integration range in the discriminant
-            variable
+        mrange : sequence of two floats
+            A sequence with two float elements which indicates the integration range in
+            the discriminant variable.
         gs : callable
             The function for the signal pdf (numerator) must accept a single
-            argument in this case the discriminant variable
-        gb : callable or list of callable
-            A function or list of functions for the backgrond pdfs (numerator)
+            argument in this case the discriminant variable.
+        gb : callable or sequence of callable
+            A function or sequence of functions for the backgrond pdfs (numerator)
             which must each accept a single argument in this case the
-            discriminant variable
-        Im : int or callable, optional
+            discriminant variable.
+        Im : 1 or callable, optional
             The function for the "variance function" or I(m) (denominator)
             which must accept a single argument in this case the discriminant
             variable. Can also pass 1 for a uniform variance function (the
-            default)
-        obs : tuple of ndarray, optional
+            default).
+        obs : array-like, optional
             You can instead pass the observed distribution to evaluate Im
             instead. This expects the entries and bin edges in a two element
-            tuple like the return value of np.histogram
+            tuple like the return value of np.histogram.
         renorm : bool, optional
             Renormalise passed functions to unity (you can override this if you
-            already know it's true)
+            already know it's true).
+        verbose : bool, optional
+            If True, produce extra output for debugging.
 
         Notes
         -----
@@ -50,53 +73,53 @@ class Cow:
         See Also
         --------
         get_weight
+
         """
         self.renorm = renorm
         self.mrange = mrange
-        self.gs = self._normalise(gs)
-        self.gb = (
-            [self._normalise(g) for g in gb]
-            if hasattr(gb, "__iter__")
-            else [self._normalise(gb)]
-        )
-        self.gk = [self.gs] + self.gb
-        if Im == 1:
-            un = uniform(*mrange)
-            n = np.diff(un.cdf(mrange))
-            self.Im = lambda m: un.pdf(m) / n
+
+        if renorm:
+
+            def normed(fn: Density) -> Density:
+                return normalized(fn, mrange)
+
         else:
-            self.Im = self._normalise(Im)
 
+            def normed(fn: Density) -> Density:
+                return fn
+
+        self.gs = normed(gs)
+        gbarg = [gb] if not isinstance(gb, Sequence) else gb
+        self.gb = [normed(g) for g in gbarg]
+        self.gk = [self.gs] + self.gb
+        if isinstance(Im, int):
+            self.Im: Density = lambda m: np.ones_like(m) / (mrange[1] - mrange[0])
+        else:
+            self.Im = normed(Im)
         self.obs = obs
+
+        xe = np.array(mrange)
         if obs:
-            if len(obs) != 2:
+            try:
+                w, xe = obs
+            except IndexError:
                 raise ValueError(
-                    """The observation must be passed as length two object
-                    containing weights and bin edges (w,xe) - ie. what is
-                    returned by np.histogram()"""
+                    "The observation must be passed as length two object "
+                    "containing weights and bin edges (w, xe) - ie. what is "
+                    "returned by numpy.histogram()"
                 )
-            w, xe = obs
             if len(w) != len(xe) - 1:
-                raise ValueError(
-                    """The bin edges and weights do not have the right
-                    respective dimensions"""
-                )
-            # normalise
-            w = w / np.sum(w)  # sum of wts now 1
-            w /= (mrange[1] - mrange[0]) / len(
-                w
-            )  # divide by bin width to get a function which integrates to 1
-
-            def f(m):
-                return w[np.argmin(m >= xe) - 1]
-
-            self.Im = np.vectorize(f)
+                msg = "The counts and bin edges do not have the right lengths."
+                raise ValueError(msg)
+            if xe[0] != mrange[0] or xe[-1] != mrange[1]:
+                msg = "Histogram range does not match mrange"
+                raise ValueError(mrange)
+            self.Im = pdf_from_histogram(w, xe)
 
         if verbose:
             print("Initialising COW:")
 
-        # compute Wkl matrix
-        self.Wkl = self._comp_Wkl()
+        self.Wkl = _compute_W(self.gk, self.Im, xe)
         if verbose:
             print("    W-matrix:")
             print("\t" + str(self.Wkl).replace("\n", "\n\t "))
@@ -107,47 +130,7 @@ class Cow:
             print("    A-matrix:")
             print("\t" + str(self.Akl).replace("\n", "\n\t "))
 
-    def _normalise(self, f):
-        if self.renorm:
-            N = quad(f, *self.mrange)[0]
-            return lambda m: f(m) / N
-        else:
-            return f
-
-    def _comp_Wkl_elem(self, k, j):
-
-        # check it's available in m
-        assert k < len(self.gk)
-        assert j < len(self.gk)
-
-        def integral(m):
-            return self.gk[k](m) * self.gk[j](m) / self.Im(m)
-
-        if self.obs is None:
-            return quad(integral, self.mrange[0], self.mrange[1])[0]
-        else:
-            tint = 0
-            xe = self.obs[1]
-            for le, he in zip(xe[:-1], xe[1:]):
-                tint += quad(integral, le, he)[0]
-            return tint
-
-    def _comp_Wkl(self):
-
-        n = len(self.gk)
-
-        ret = np.identity(n)
-
-        for i in range(n):
-            for j in range(n):
-                if i > j:
-                    ret[i, j] = ret[j, i]
-                else:
-                    ret[i, j] = self._comp_Wkl_elem(i, j)
-
-        return ret
-
-    def wk(self, k, m):
+    def get_weight(self, k: int, m: FloatArray) -> FloatArray:
         """
         Return the weights.
 
@@ -162,20 +145,46 @@ class Cow:
         -------
         ndarray :
             Values of the weights
-        """
-        n = len(self.gk)
-        return np.sum(
-            [self.Akl[k, j] * self.gk[j](m) / self.Im(m) for j in range(n)], axis=0
-        )
 
-    def get_weight(self, k, m):
         """
-        Return the weights.
+        im = self.Im(m)
+        gm = [g(m) / im for g in self.gk]
+        A = self.Akl[k]
+        return A @ gm  # type:ignore
 
-        Wrapper for `wk`
+    # alias for get_weight
+    wk = get_weight
 
-        See Also
-        --------
-        wk
-        """
-        return self.wk(k, m)
+
+def _compute_W(
+    gk: Sequence[Density],
+    im: Density,
+    me: FloatArray,
+) -> FloatArray:
+    n = len(gk)
+    w = np.empty((n, n))
+    for i in range(n):
+        for j in range(n):
+            if i > j:
+                w[i, j] = w[j, i]
+            else:
+                w[i, j] = _compute_W_element(i, j, gk, im, me)
+    return w
+
+
+def _compute_W_element(
+    k: int,
+    j: int,
+    gk: Sequence[Density],
+    im: Density,
+    me: Optional[FloatArray],
+) -> float:
+    def fn(m: FloatArray) -> FloatArray:
+        return gk[k](m) * gk[j](m) / im(m)
+
+    result = 0
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        for x0, x1 in zip(me[:-1], me[1:]):  # type:ignore
+            result += quad(fn, x0, x1)[0]
+    return result

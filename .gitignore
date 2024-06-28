@@ -9,5 +9,5 @@ build/
 doc/.ipynb_checkpoints/
 venv
 .vscode
-.pytest_cache
+.*_cache
 outf.root
