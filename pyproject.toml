@@ -36,7 +36,7 @@ doc = [
 ]
 
 [project.urls]
-repositoy = "https://github.com/matthewkenzie/sweights"
+repositoy = "https://github.com/sweights/sweights"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -47,25 +47,29 @@ where = ["src"]
 profile = "black"
 multi_line_output = 3
 
-[tool.ruff]
+[tool.ruff.lint]
 extend-select = ["E", "F", "W", "D"]
 ignore = ["D212", "D203"]
 unfixable = ["ERA"]
 
-[tool.ruff.per-file-ignores]
-"test_*.py" = ["D"]
+[tool.ruff.lint.per-file-ignores]
+"test_*.py" = ["D", "E731"]
+"doc/**" = ["D", "E731"]
 
 [tool.mypy]
+plugins = "numpy.typing.mypy_plugin"
 strict = true
-no_implicit_optional = false
+exclude = "test_.*\\.py$"
 allow_redefinition = true
 ignore_missing_imports = true
-show_error_codes = true
-files = "src/resample/*.py"
+
+[[tool.mypy.overrides]]
+module = ["sweights.covariance", "sweights.sweight", "sweights.independence"]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 addopts = "--doctest-modules --strict-config --strict-markers -q -ra --ff"
-testpaths = ["src/resample", "tests"]
+testpaths = ["src/sweights", "tests"]
 log_cli_level = "INFO"
 xfail_strict = true
 filterwarnings = ["error::DeprecationWarning", "error::FutureWarning"]

@@ -11,6 +11,7 @@ Documentation for the sweights package
     install
     reference
     notebooks/tutorial
+    notebooks/factorization_test
     notebooks/roopdf_conversion
     contribute
 

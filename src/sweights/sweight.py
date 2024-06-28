@@ -6,6 +6,7 @@ from scipy.linalg import solve
 from scipy.interpolate import InterpolatedUnivariateSpline
 from .util import import_optional_module, convert_rf_pdf
 from tempfile import NamedTemporaryFile
+from .typing import FloatArray
 
 __all__ = ["convert_rf_pdf", "SWeight"]
 
@@ -92,6 +93,7 @@ class SWeight:
         See Also
         --------
         get_weight, make_weight_plot
+
         """
         self.allowed_methods = [
             "summation",
@@ -325,6 +327,23 @@ class SWeight:
 
         return self.alphas
 
+    def __call__(self, m: FloatArray) -> FloatArray:
+        """
+        Return signal weights.
+
+        Parameters
+        ----------
+        m : ndarray
+            Values of the discriminating variable to compute weights for.
+
+        Returns
+        -------
+        ndarray :
+            Values of the weights
+
+        """
+        return self.get_weight(0, m)
+
     def get_weight(self, icomp=0, *args):
         """
         Return the weights.
@@ -344,6 +363,7 @@ class SWeight:
         -------
         ndarray
             An array of the weights
+
         """
         if self.method == "tsplot":
             return self.tsplotw[icomp](*args)
@@ -377,6 +397,7 @@ class SWeight:
         labels : list of str
             List of legend labels. Default will use those passed in `compnames`
             with `__init__`
+
         """
         if self.ndiscvars != 1:
             print("WARNING - I dont know how to plot this")
