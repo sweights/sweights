@@ -36,7 +36,7 @@ doc = [
 ]
 
 [project.urls]
-repositoy = "https://github.com/matthewkenzie/sweights"
+repositoy = "https://github.com/sweights/sweights"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -53,8 +53,8 @@ ignore = ["D212", "D203"]
 unfixable = ["ERA"]
 
 [tool.ruff.lint.per-file-ignores]
-"test_*.py" = ["D"]
-"doc/conf.py" = ["D"]
+"test_*.py" = ["D", "E731"]
+"doc/**" = ["D", "E731"]
 
 [tool.mypy]
 plugins = "numpy.typing.mypy_plugin"

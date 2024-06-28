@@ -6,7 +6,7 @@ from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from scipy.integrate import quad
 import warnings
 from typing import Tuple, Optional, Union, Any, TYPE_CHECKING
-from .typing import RooAbsPdf, RooRealVar, Density, FloatArray
+from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range
 from numpy.typing import ArrayLike
 
 __all__ = [
@@ -157,7 +157,7 @@ def plot_binned(
     data: ArrayLike,
     *,
     bins: Optional[Union[int, FloatArray]] = None,
-    range: Optional[Tuple[float, float]] = None,
+    range: Optional[Range] = None,
     weights: Optional[ArrayLike] = None,
     **kwargs: Any,
 ) -> Tuple[FloatArray, FloatArray, FloatArray]:
@@ -201,7 +201,7 @@ def plot_binned(
     return val, err, xe
 
 
-def normalized(fn: Density, range: Tuple[float, float]) -> Density:
+def normalized(fn: Density, range: Range) -> Density:
     """Return a function normalized over the given range."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)

@@ -6,6 +6,7 @@ import numpy as np
 
 FloatArray = NDArray[np.float64]
 Density = Callable[[FloatArray], FloatArray]
+
 Range = Tuple[float, float]
 
 RooAbsPdf = Any

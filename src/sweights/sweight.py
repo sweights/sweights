@@ -6,6 +6,7 @@ from scipy.linalg import solve
 from scipy.interpolate import InterpolatedUnivariateSpline
 from .util import import_optional_module, convert_rf_pdf
 from tempfile import NamedTemporaryFile
+from .typing import FloatArray
 
 __all__ = ["convert_rf_pdf", "SWeight"]
 
@@ -325,6 +326,23 @@ class SWeight:
             print("\t" + str(self.alphas).replace("\n", "\n\t"))
 
         return self.alphas
+
+    def __call__(self, m: FloatArray) -> FloatArray:
+        """
+        Return signal weights.
+
+        Parameters
+        ----------
+        m : ndarray
+            Values of the discriminating variable to compute weights for.
+
+        Returns
+        -------
+        ndarray :
+            Values of the weights
+
+        """
+        return self.get_weight(0, m)
 
     def get_weight(self, icomp=0, *args):
         """

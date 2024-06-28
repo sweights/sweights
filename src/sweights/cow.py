@@ -26,7 +26,7 @@ class Cow:
         mrange: Tuple[float, float],
         gs: Density,
         gb: Union[Density, Sequence[Density]],
-        Im: Union[int, Density] = 1,
+        Im: Optional[Union[int, Density]] = None,
         obs: Optional[Tuple[FloatArray, FloatArray]] = None,
         renorm: bool = True,
         verbose: bool = True,
@@ -40,22 +40,21 @@ class Cow:
 
         Parameters
         ----------
-        mrange : sequence of two floats
-            A sequence with two float elements which indicates the integration range in
-            the discriminant variable.
+        mrange : tuple(float, float)
+            Integration range in the discriminant variable.
         gs : callable
-            The function for the signal pdf (numerator) must accept a single
-            argument in this case the discriminant variable.
+            Signal PDF in the discriminant variable. Must accept an array-like argument
+            and return an array.
         gb : callable or sequence of callable
-            A function or sequence of functions for the backgrond pdfs (numerator)
-            which must each accept a single argument in this case the
-            discriminant variable.
-        Im : 1 or callable, optional
-            The function for the "variance function" or I(m) (denominator)
-            which must accept a single argument in this case the discriminant
-            variable. Can also pass 1 for a uniform variance function (the
-            default).
-        obs : array-like, optional
+            Background PDF in the discriminant variable. Each must accept an
+            array-like argument and return an array. This can also be a sequence of
+            PDFs that comprise the background.
+        Im : callable or None, optional
+            The "variance function" in the COWs formula. An arbitrary density normalized
+            over the integration range. If a callable is provided, it must accept an
+            array-like argument and return an array. If this argument is None, a
+            constant density is used (the default).
+        obs : tuple(array-like, array-like), optional
             You can instead pass the observed distribution to evaluate Im
             instead. This expects the entries and bin edges in a two element
             tuple like the return value of np.histogram.
@@ -92,7 +91,10 @@ class Cow:
         gbarg = [gb] if not isinstance(gb, Sequence) else gb
         self.gb = [normed(g) for g in gbarg]
         self.gk = [self.gs] + self.gb
-        if isinstance(Im, int):
+        if Im is None or isinstance(Im, int):
+            if isinstance(Im, int):
+                msg = "Passing Im=1 is deprecated, use Im=None instead"
+                warnings.warn(msg, FutureWarning)
             self.Im: Density = lambda m: np.ones_like(m) / (mrange[1] - mrange[0])
         else:
             self.Im = normed(Im)
@@ -130,16 +132,33 @@ class Cow:
             print("    A-matrix:")
             print("\t" + str(self.Akl).replace("\n", "\n\t "))
 
+    def __call__(self, m: FloatArray) -> FloatArray:
+        """
+        Return signal weights.
+
+        Parameters
+        ----------
+        m : ndarray
+            Values of the discriminating variable to compute weights for.
+
+        Returns
+        -------
+        ndarray :
+            Values of the weights
+
+        """
+        return self.get_weight(0, m)
+
     def get_weight(self, k: int, m: FloatArray) -> FloatArray:
         """
-        Return the weights.
+        Return weights for component k.
 
         Parameters
         ----------
         k : int
-            Index of the component
+            Index of the component.
         m : ndarray
-            Values of the discriminating variable to compute weights for
+            Values of the discriminating variable to compute weights for.
 
         Returns
         -------
