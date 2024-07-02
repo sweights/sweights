@@ -19,7 +19,7 @@ jobs:
 
     environment:
       name: pypi
-      url: https://pypi.org/p/sweights
+      url: https://pypi.org/project/sweights
     permissions:
       id-token: write
 
