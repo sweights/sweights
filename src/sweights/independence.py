@@ -1,18 +1,25 @@
 """Module to check and plot independence."""
 
-import numpy as np
 from scipy.stats import kendalltau
 from .util import import_optional_module
+
+__all__ = ["kendall_tau", "plot_indep_scatter"]
 
 
 def kendall_tau(x, y):
     """
     Return kendall tau correlation coefficient.
 
-    Useful for ascertainting the extent to which two samples
-    are independent. In particular for sweights and COWs one
-    wants to know the extent to which the discriminant and
-    control variables factorise.
+    Useful for ascertainting the extent to which two variables are independent and thus
+    the PDF for both variables factorizes into two independent PDFs, one for each
+    variable. This is a requirement to apply the classic sWeights method.
+
+    WARNING: Using this function only makes sense if you have pure samples for all
+    components considered in the sWeights method. You cannot apply this to a mixed
+    sample. In general, you won't have these isolated samples for each component,
+    because then you would not need sWeights. Yet, you can often get them from
+    Monte-Carlo simulation of the experiment. If you trust the simulation, you can use
+    this coefficient to test for factorization.
 
     Parameters
     ----------
@@ -36,9 +43,11 @@ def kendall_tau(x, y):
 
     """
     assert len(x) == len(y)
-    err_approx = 1.0 / np.sqrt(len(x))
     result = kendalltau(x, y)
-    return (result.correlation, err_approx, result.pvalue)
+    n = len(x)
+    # formula from https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.kendalltau.html
+    approx_err = (2 * (2 * n + 5)) / (9 * n * (n - 1))
+    return (result.correlation, approx_err, result.pvalue)
 
 
 def plot_indep_scatter(x, y, reduction_factor=None, save=None, show=False):
