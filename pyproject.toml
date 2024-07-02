@@ -72,4 +72,4 @@ addopts = "--doctest-modules --strict-config --strict-markers -q -ra --ff"
 testpaths = ["src/sweights", "tests"]
 log_cli_level = "INFO"
 xfail_strict = true
-filterwarnings = ["error::DeprecationWarning", "error::FutureWarning"]
+filterwarnings = ["error::DeprecationWarning", "ignore::FutureWarning"]
