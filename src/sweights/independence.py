@@ -46,8 +46,8 @@ def kendall_tau(x, y):
     result = kendalltau(x, y)
     n = len(x)
     # formula from https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.kendalltau.html
-    approx_err = (2 * (2 * n + 5)) / (9 * n * (n - 1))
-    return (result.correlation, approx_err, result.pvalue)
+    approx_var = (2 * (2 * n + 5)) / (9 * n * (n - 1))
+    return (result.correlation, approx_var**0.5, result.pvalue)
 
 
 def plot_indep_scatter(x, y, reduction_factor=None, save=None, show=False):
