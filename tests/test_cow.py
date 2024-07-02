@@ -1,4 +1,4 @@
-from sweights.toy import make_classic_toy
+from sweights.testing import make_classic_toy
 from sweights.cow import Cow
 from scipy.stats import norm, expon
 from scipy.optimize import minimize
