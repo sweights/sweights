@@ -156,9 +156,10 @@ def convert_rf_pdf(
 def plot_binned(
     data: ArrayLike,
     *,
-    bins: Optional[Union[int, FloatArray]] = None,
+    bins: Optional[Union[int, FloatArray]] = 100,
     range: Optional[Range] = None,
     weights: Optional[ArrayLike] = None,
+    density: bool = False,
     **kwargs: Any,
 ) -> Tuple[FloatArray, FloatArray, FloatArray]:
     """
@@ -174,6 +175,8 @@ def plot_binned(
         Range of the histogram.
     weights: array-like or None, optional
         Weights.
+    density: bool, optional (default is False)
+        If True, normalize the histogram.
     axes: Axes or None, optional
         Axes to plot on. If None, then use matplotlib.pyplot.gca().
     **kwargs:
@@ -196,6 +199,10 @@ def plot_binned(
         kwargs["fmt"] = kwargs.pop("marker")
     elif "fmt" not in kwargs:
         kwargs["fmt"] = "o"
+    if density:
+        f = 1 / (np.sum(val) * np.diff(xe))
+        val = val * f
+        err = err * f
     plt = import_optional_module("matplotlib.pyplot")
     plt.errorbar(cx, val, err, **kwargs)
     return val, err, xe
@@ -211,9 +218,8 @@ def normalized(fn: Density, range: Range) -> Density:
 
 def pdf_from_histogram(w: FloatArray, xe: FloatArray) -> Density:
     """Return a pdf (piecewise constant) constructe from a histogram."""
-    w = w / np.sum(w)  # sum of wts now 1
-    # divide by bin width to get a function which integrates to 1
-    w *= len(w) / (xe[-1] - xe[0])
+    w = w / np.sum(w)
+    w /= np.diff(xe)
 
     def fn(x: FloatArray) -> FloatArray:
         r = np.zeros_like(x)

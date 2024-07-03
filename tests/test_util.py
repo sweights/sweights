@@ -51,10 +51,13 @@ def test_normalized():
 
 
 def test_pdf_from_histogram():
-    xe = np.array([0.0, 1.0, 2.0])
+    xe = np.array([0.0, 1.0, 1.5])
     w = np.array([1.0, 3.0])
     fn = util.pdf_from_histogram(w, xe)
 
-    x = np.array([-0.1, 0.0, 0.5, 0.99, 1.0, 1.5, 1.99, 2.0, 2.5, 3.0, 10.0])
-    y = [0.0, 0.25, 0.25, 0.25, 0.75, 0.75, 0.75, 0, 0, 0, 0]
+    integral = np.sum(np.diff(xe) * np.array([fn(0.0), fn(1.0)]))
+    assert_allclose(integral, 1.0)
+
+    x = np.array([-0.1, 0.0, 0.5, 0.99, 1.0, 1.1, 1.49, 1.5, 10.0])
+    y = [0.0, 0.25, 0.25, 0.25, 1.5, 1.5, 1.5, 0, 0]
     assert_allclose(fn(x), y)
