@@ -6,7 +6,7 @@ from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from scipy.integrate import quad
 from scipy.special import comb
 import warnings
-from typing import Tuple, Optional, Union, Any, TYPE_CHECKING, List
+from typing import Tuple, Optional, Union, Any, TYPE_CHECKING, List, Callable
 from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range
 from numpy.typing import ArrayLike
 
@@ -16,6 +16,9 @@ __all__ = [
     "plot_binned",
     "normalized",
     "pdf_from_histogram",
+    "BernsteinBasisPdf",
+    "make_bernstein_pdf",
+    "make_weighted_negative_log_likelihood",
 ]
 
 
@@ -251,6 +254,21 @@ class BernsteinBasisPdf:
     """Bernstein basis PDF."""
 
     def __init__(self, k: int, n: int, a: float, b: float):
+        """
+        Initialize Bernstein basis.
+
+        Parameters
+        ----------
+        k: int
+            Index of the basis.
+        n: int
+            Order of the polynom.
+        a: float
+            Starting value where the polynomial is defined and normalized.
+        b: float
+            Ending value where the polynomial is defined and normalized.
+
+        """
         self._a = a
         self._iw = 1.0 / (b - a)
         self._fnorm: float = comb(n, k) * self._iw * (n + 1)
@@ -258,6 +276,7 @@ class BernsteinBasisPdf:
         self._ak = n - k
 
     def __call__(self, x: FloatArray) -> FloatArray:
+        """Compute probability density."""
         z: FloatArray = (x - self._a) * self._iw
         az: FloatArray = 1.0 - z
         return z**self._k * az**self._ak * self._fnorm
@@ -289,3 +308,31 @@ def make_bernstein_pdf(degree: int, a: float, b: float) -> List[Density]:
         raise ValueError("minimum order is 1")
 
     return [BernsteinBasisPdf(i, degree, a, b) for i in range(degree + 1)]
+
+
+def make_weighted_negative_log_likelihood(
+    x: FloatArray,
+    weights: FloatArray,
+    model: Callable[..., FloatArray],
+) -> Callable[..., float]:
+    """Construct weighted log-likelihood function compatible with iminuit."""
+    util = import_optional_module("iminuit.util")
+    cost = import_optional_module("iminuit.cost")
+    safe_log = cost._safe_log
+
+    parameters = {}
+    first = True
+    for par, limits in util.describe(model, annotations=True).items():
+        if first:
+            first = False
+            continue
+        parameters[par] = limits
+
+    def nll(*args: float) -> float:
+        lp = safe_log(model(x, *args))
+        return -2 * np.sum(weights * lp)  # type:ignore
+
+    nll.errordef = 1.0  # type:ignore
+    nll._parameters = parameters  # type:ignore
+
+    return nll
