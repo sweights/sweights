@@ -24,7 +24,7 @@ class SWeight:
         compnames=None,
         alphas=None,
         rfobs=[],
-        verbose=True,
+        verbose=False,
         checks=True,
     ):
         """
@@ -72,8 +72,8 @@ class SWeight:
         rfobs: list, optional
             If using the 'roofit' method then the discriminating variables
             (of type RooRealVar) on which the pdfs depend must also be passed
-        verbose: bool, optional
-            Print output
+        verbose: bool, optional (default is False)
+            Print intermediate results.
         checks: bool, optional
             Perform some checks that the derived weights are self consistent,
             in particular check that the sum of all component weights for a

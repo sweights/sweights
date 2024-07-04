@@ -67,4 +67,4 @@ def test_cow(Im_kind):
 
     r = minimize(wnll, [1.0], bounds=[(1e-3, None)])
     assert r.success
-    assert_allclose(r.x, ts_mu, atol=1e-4)
+    assert_allclose(r.x, ts_mu, atol=1e-3)

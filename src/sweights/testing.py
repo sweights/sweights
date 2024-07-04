@@ -1,9 +1,10 @@
 """Toy distributions to use in examples."""
 
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Callable, Union, List
 from numpy.typing import NDArray
 from scipy.stats import norm, expon
+from .typing import FloatArray
 
 
 def make_classic_toy(
@@ -15,7 +16,7 @@ def make_classic_toy(
     trange: Tuple[float, float] = (0, 1.5),
     ms_mu: float = 0.5,
     ms_sigma: float = 0.1,
-    mb_mu: float = 0.5,
+    mb_mu: Union[float, Callable[[FloatArray], FloatArray]] = 0.5,
     ts_mu: float = 0.2,
     tb_mu: float = 0.1,
     tb_sigma: float = 0.1,
@@ -50,9 +51,11 @@ def make_classic_toy(
     ms_sigma: float, optional
         Standard deviation of the normal distribution in m. If the distribution is not
         truncated, this is the expectation of the untruncated distribution.
-    mb_mu: float, optional
+    mb_mu: float or callable, optional
         Expectation of the exponential distribution in m. If the distribution is not
-        truncated, this is the expectation of the untruncated distribution.
+        truncated, this is the expectation of the untruncated distribution. If it is a
+        callable, it computes the value as a function of the t-variable. This can be
+        used to test factorization violation.
     ts_mu: float, optional
         Expectation of the exponential distribution in m. If the distribution is not
         truncated, this is the expectation of the untruncated distribution.
@@ -72,14 +75,6 @@ def make_classic_toy(
     n_sig = rng.poisson(s) if random_sample_size else int(s)
     n_bkg = rng.poisson(b) if random_sample_size else int(b)
 
-    dms = norm(ms_mu, ms_sigma)
-    dmb = expon(0, mb_mu)
-
-    m_s = dms.ppf(rng.uniform(*dms.cdf(mrange), size=n_sig))  # type:ignore
-    m_b = dmb.ppf(rng.uniform(*dmb.cdf(mrange), size=n_bkg))  # type:ignore
-
-    m = np.append(m_s, m_b)
-
     dts = expon(0, ts_mu)
     dtb = norm(tb_mu, tb_sigma)
 
@@ -87,6 +82,23 @@ def make_classic_toy(
     t_b = dtb.ppf(rng.uniform(*dtb.cdf(trange), size=n_bkg))  # type:ignore
 
     t = np.append(t_s, t_b)
+
+    dms = norm(ms_mu, ms_sigma)
+    m_s = dms.ppf(rng.uniform(*dms.cdf(mrange), size=n_sig))  # type:ignore
+
+    m_b: Union[NDArray[np.float64], List[float]]
+    if isinstance(mb_mu, float):
+        dmb = expon(0, mb_mu)
+
+        m_b = dmb.ppf(rng.uniform(*dmb.cdf(mrange), size=n_bkg))  # type:ignore
+    else:
+        m_b = []
+        for mui in mb_mu(t_b):
+            dmb = expon(0, mui)
+            mi = dmb.ppf(rng.uniform(*dmb.cdf(mrange)))
+            m_b.append(mi)
+
+    m = np.append(m_s, m_b)
 
     sigmask = np.zeros(len(m), dtype=bool)
     sigmask[: len(m_s)] = 1
