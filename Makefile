@@ -1,9 +1,8 @@
-doc: build/html/done
+doc: build/html/index.html
 
-build/html/done: doc/conf.py $(wildcard src/sweights/*.py doc/*.rst doc/_static/* doc/plots/* *.rst examples/*.py)
+build/html/index.html: doc/conf.py $(wildcard src/sweights/*.py doc/*/* doc/*)
 	mkdir -p build/html
 	sphinx-build -j3 -W -a -E -b html -d build/doctrees doc build/html
-	touch build/html/done
 
 clean:
 	rm -rf build
