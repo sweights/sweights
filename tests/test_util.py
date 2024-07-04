@@ -2,6 +2,7 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 from sweights import util
+from scipy.integrate import quad
 
 
 @pytest.mark.parametrize(
@@ -61,3 +62,11 @@ def test_pdf_from_histogram():
     x = np.array([-0.1, 0.0, 0.5, 0.99, 1.0, 1.1, 1.49, 1.5, 10.0])
     y = [0.0, 0.25, 0.25, 0.25, 1.5, 1.5, 1.5, 0, 0]
     assert_allclose(fn(x), y)
+
+
+@pytest.mark.parametrize("order", (1, 2, 3))
+def test_make_bernstein_pdf(order):
+    range = -1.0, 2.0
+    pdfs = util.make_bernstein_pdf(order, *range)
+    integrals = [quad(pdf, *range)[0] for pdf in pdfs]
+    assert_allclose(integrals, np.ones(order + 1))

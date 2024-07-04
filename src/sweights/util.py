@@ -4,8 +4,9 @@ from packaging.version import Version
 import numpy as np
 from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from scipy.integrate import quad
+from scipy.special import comb
 import warnings
-from typing import Tuple, Optional, Union, Any, TYPE_CHECKING
+from typing import Tuple, Optional, Union, Any, TYPE_CHECKING, List
 from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range
 from numpy.typing import ArrayLike
 
@@ -217,7 +218,22 @@ def normalized(fn: Density, range: Range) -> Density:
 
 
 def pdf_from_histogram(w: FloatArray, xe: FloatArray) -> Density:
-    """Return a pdf (piecewise constant) constructe from a histogram."""
+    """
+    Return a pdf (piecewise constant) constructe from a histogram.
+
+    Parameters
+    ----------
+    w: array of float or int
+        Counts of the histogram.
+    xe: array of float
+        Edges of the histogram.
+
+    Returns
+    -------
+    Callable
+        A normalized density.
+
+    """
     w = w / np.sum(w)
     w /= np.diff(xe)
 
@@ -229,3 +245,47 @@ def pdf_from_histogram(w: FloatArray, xe: FloatArray) -> Density:
         return r
 
     return fn
+
+
+class BernsteinBasisPdf:
+    """Bernstein basis PDF."""
+
+    def __init__(self, k: int, n: int, a: float, b: float):
+        self._a = a
+        self._iw = 1.0 / (b - a)
+        self._fnorm: float = comb(n, k) * self._iw * (n + 1)
+        self._k = k
+        self._ak = n - k
+
+    def __call__(self, x: FloatArray) -> FloatArray:
+        z: FloatArray = (x - self._a) * self._iw
+        az: FloatArray = 1.0 - z
+        return z**self._k * az**self._ak * self._fnorm
+
+
+def make_bernstein_pdf(degree: int, a: float, b: float) -> List[Density]:
+    """
+    Construct a normalized Bernstein basis of given degree.
+
+    The Bernstein basis polynomials returned by this function
+    are normalized over the given range.
+
+    Parameters
+    ----------
+    degree: int
+        Order of the Bernstein basis. Must be at least 1.
+    a: float
+        Starting value where the polynomial is defined and normalized.
+    b: float
+        Ending value where the polynomial is defined and normalized.
+
+    Returns
+    -------
+    Callable
+        Normalized density.
+
+    """
+    if degree < 1:
+        raise ValueError("minimum order is 1")
+
+    return [BernsteinBasisPdf(i, degree, a, b) for i in range(degree + 1)]
