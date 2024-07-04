@@ -19,11 +19,12 @@ class Cow:
     gk: List[Density]
     Akl: FloatArray
     renorm: bool
+    ksig: int
 
     def __init__(
         self,
         mrange: Range,
-        gs: Density,
+        gs: Union[Density, Sequence[Density]],
         gb: Union[Density, Sequence[Density]],
         Im: Optional[Union[int, Density, Tuple[FloatArray, FloatArray]]] = None,
         renorm: bool = True,
@@ -41,10 +42,11 @@ class Cow:
         ----------
         mrange : tuple(float, float)
             Integration range in the discriminant variable.
-        gs : callable
+        gs : callable  or sequence of callables
             Signal PDF in the discriminant variable. Must accept an array-like argument
-            and return an array.
-        gb : callable or sequence of callable
+            and return an array.  This can also be a sequence of
+            PDFs that comprise the signal.
+        gb : callable or sequence of callables
             Background PDF in the discriminant variable. Each must accept an
             array-like argument and return an array. This can also be a sequence of
             PDFs that comprise the background.
@@ -92,10 +94,12 @@ class Cow:
             def normed(fn: Density) -> Density:
                 return fn
 
-        self.gs = normed(gs)
-        gbarg = [gb] if not isinstance(gb, Sequence) else gb
-        self.gb = [normed(g) for g in gbarg]
-        self.gk = [self.gs] + self.gb
+        gs1 = [gs] if not isinstance(gs, Sequence) else gs
+        gs2 = [normed(g) for g in gs1]
+        self.ksig = len(gs2)
+        gb1 = [gb] if not isinstance(gb, Sequence) else gb
+        gb2 = [normed(g) for g in gb1]
+        self.gk = gs2 + gb2
 
         xe = np.array(mrange)
         if Im is None or isinstance(Im, int):
@@ -140,7 +144,7 @@ class Cow:
             Values of the weights
 
         """
-        return self.get_weight(0, m)
+        return sum(self.get_weight(k, m) for k in range(self.ksig))  # type:ignore
 
     def get_weight(self, k: int, m: FloatArray) -> FloatArray:
         """
