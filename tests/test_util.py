@@ -70,3 +70,26 @@ def test_make_bernstein_pdf(order):
     pdfs = util.make_bernstein_pdf(order, *range)
     integrals = [quad(pdf, *range)[0] for pdf in pdfs]
     assert_allclose(integrals, np.ones(order + 1))
+
+
+def test_make_weighted_negative_log_likelihood():
+    mutil = pytest.importorskip("iminuit.util")
+    mtyping = pytest.importorskip("iminuit.typing")
+
+    w = np.array([1.0, 2.0, 3.0])
+    x = np.array([1.0, 2.0, 3.0])
+
+    Positive = mtyping.Annotated[float, mtyping.Gt(0)]
+
+    def model(x, a: Positive, b):
+        return a + x**b
+
+    ref = -2 * np.sum(w * np.log(model(x, 1, 2)))
+
+    nll = util.make_weighted_negative_log_likelihood(x, w, model)
+
+    assert mutil.describe(nll, annotations=True) == {
+        "a": (0, np.inf),
+        "b": None,
+    }
+    assert_allclose(nll(1, 2), ref)

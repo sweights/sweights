@@ -87,7 +87,7 @@ def make_classic_toy(
     m_s = dms.ppf(rng.uniform(*dms.cdf(mrange), size=n_sig))  # type:ignore
 
     m_b: Union[NDArray[np.float64], List[float]]
-    if isinstance(mb_mu, float):
+    if isinstance(mb_mu, (int, float)):
         dmb = expon(0, mb_mu)
 
         m_b = dmb.ppf(rng.uniform(*dmb.cdf(mrange), size=n_bkg))  # type:ignore
