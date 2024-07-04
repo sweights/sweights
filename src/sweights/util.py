@@ -11,7 +11,6 @@ from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range
 from numpy.typing import ArrayLike
 
 __all__ = [
-    "import_optional_module",
     "convert_rf_pdf",
     "plot_binned",
     "normalized",
@@ -26,9 +25,11 @@ def import_optional_module(name: str, *, min_version: str = "") -> Any:
     """
     Import an optional dependency.
 
-    In this package, we use optional dependencies in some places. We enhance the
-    standard error message to make it more helpful and optionally check whether the
-    version of the package matches the required minimum.
+    Users are not supposed to call this themselves. In this package, we use optional
+    dependencies in some places. We enhance the standard error message to make it more
+    helpful and optionally check whether the version of the package matches the required
+    minimum.
+
     """
     from importlib import import_module
 

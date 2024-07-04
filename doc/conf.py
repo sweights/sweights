@@ -23,6 +23,13 @@ extensions = [
 autoclass_content = "both"
 autosummary_generate = True
 
+# should prevent complicated types signatures in docs, but does not work?
+autodoc_type_aliases = {
+    "ArrayLike": "ArrayLike",
+    "Density": "Density",
+    "FloatArray": "FloatArray",
+}
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 

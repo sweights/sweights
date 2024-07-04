@@ -38,5 +38,9 @@ Covariance Correction
 Utilities
 ---------
 
+.. automodule:: sweights.util
+   :members:
+
+.. currentmodule:: sweights
 .. autofunction:: kendall_tau
 .. autofunction:: convert_rf_pdf
