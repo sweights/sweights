@@ -5,8 +5,9 @@ import numpy as np
 from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from scipy.integrate import quad
 from scipy.special import comb
+from scipy.optimize import minimize
 import warnings
-from typing import Tuple, Optional, Union, Any, TYPE_CHECKING, List, Callable
+from typing import Tuple, Optional, Union, Any, TYPE_CHECKING, List, Callable, Sequence
 from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range
 from numpy.typing import ArrayLike
 
@@ -318,8 +319,6 @@ def make_weighted_negative_log_likelihood(
 ) -> Callable[..., float]:
     """Construct weighted log-likelihood function compatible with iminuit."""
     util = import_optional_module("iminuit.util")
-    cost = import_optional_module("iminuit.cost")
-    safe_log = cost._safe_log
 
     parameters = {}
     first = True
@@ -337,3 +336,35 @@ def make_weighted_negative_log_likelihood(
     nll._parameters = parameters  # type:ignore
 
     return nll
+
+
+class FitError(RuntimeError):
+    pass
+
+
+def fit_mixture(x: FloatArray, pdfs: Sequence[Density]) -> FloatArray:
+    pdfsx = [pdf(x) for pdf in pdfs]
+
+    def cost(par: FloatArray) -> np.float64:
+        fint = 0.0
+        f = np.zeros_like(x)
+        for a, pdfx in zip(par, pdfsx):
+            f += a * pdfx
+            fint += a
+        return 2 * (fint - np.sum(safe_log(f)))
+
+    bounds = np.zeros((len(pdfs), 2))
+    bounds[:, 1] = np.inf
+    r = minimize(cost, np.ones(len(pdfs)) * len(x) / len(pdfs), bounds=bounds)
+    if not r.success:
+        msg = f"fit failed: {r.message}"
+        raise FitError(msg)
+    return r.x  # type:ignore
+
+
+TINY_FLOAT = np.finfo(float).tiny
+
+
+def safe_log(x: FloatArray) -> FloatArray:
+    # guard against x = 0
+    return np.log(np.maximum(TINY_FLOAT, x))  # type:ignore

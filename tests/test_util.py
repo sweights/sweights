@@ -3,6 +3,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 from sweights import util
 from scipy.integrate import quad
+from scipy.stats import norm, expon
 
 
 @pytest.mark.parametrize(
@@ -93,3 +94,14 @@ def test_make_weighted_negative_log_likelihood():
         "b": None,
     }
     assert_allclose(nll(1, 2), ref)
+
+
+def test_fit_mixture():
+    rng = np.random.default_rng(1)
+    d1 = expon(0, 0.5)
+    d2 = norm(0.5, 0.1)
+    x1 = d1.rvs(100, random_state=rng)
+    x2 = d2.rvs(200, random_state=rng)
+    x = np.append(x1, x2)
+    a = util.fit_mixture(x, (d1.pdf, d2.pdf))
+    assert_allclose(a, (100, 200), atol=5)

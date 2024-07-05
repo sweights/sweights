@@ -129,7 +129,7 @@ class Cow:
             print("    A-matrix:")
             print("\t" + str(self.Akl).replace("\n", "\n\t "))
 
-    def __call__(self, m: FloatArray) -> FloatArray:
+    def __call__(self, m: FloatArray, idx: int = -1) -> FloatArray:
         """
         Return signal weights.
 
@@ -137,6 +137,11 @@ class Cow:
         ----------
         m : ndarray
             Values of the discriminating variable to compute weights for.
+        idx : int, optional (default = -1)
+            Index of the component to compute weights for. If equal to -1,
+            compute weights for the signal component. If there are several
+            signal components (to combat non-factoriation), compute weights
+            for the combined signal.
 
         Returns
         -------
@@ -144,7 +149,9 @@ class Cow:
             Values of the weights
 
         """
-        return sum(self.get_weight(k, m) for k in range(self.ksig))  # type:ignore
+        if idx == -1:
+            return sum(self.get_weight(k, m) for k in range(self.ksig))  # type:ignore
+        return self.get_weight(idx, m)
 
     def get_weight(self, k: int, m: FloatArray) -> FloatArray:
         """
