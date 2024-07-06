@@ -7,9 +7,20 @@ from scipy.integrate import quad
 from scipy.special import comb
 from scipy.optimize import minimize
 import warnings
-from typing import Tuple, Optional, Union, Any, TYPE_CHECKING, List, Callable, Sequence
+from typing import (
+    Tuple,
+    Optional,
+    Union,
+    Any,
+    TYPE_CHECKING,
+    List,
+    Callable,
+    Sequence,
+    Dict,
+)
 from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range
 from numpy.typing import ArrayLike
+import inspect
 
 __all__ = [
     "convert_rf_pdf",
@@ -342,24 +353,112 @@ class FitError(RuntimeError):
     pass
 
 
-def fit_mixture(x: FloatArray, pdfs: Sequence[Density]) -> FloatArray:
-    pdfsx = [pdf(x) for pdf in pdfs]
+def fit_mixture(
+    x: FloatArray,
+    pdfs: Sequence[Density],
+    yields: Optional[Sequence[float]] = None,
+    parameters: List[List[str]] = [],
+    bounds: Dict[Density, Dict[str, Range]] = {},
+    starts: Dict[Density, Dict[str, float]] = {},
+) -> Tuple[List[float], List[Dict[str, float]]]:
+    pdfs = list(pdfs)
+    if any(parameters):
+        pdf_bounds = []
+        pdf_starts = []
+        for pdf, pars in zip(pdfs, parameters):
+            bounds_dict = bounds.get(pdf, {})
+            starts_dict = starts.get(pdf, {})
+            bounds_list = [bounds_dict.get(k, (-np.inf, np.inf)) for k in pars]
+            pdf_bounds.append(bounds_list)
+            starts_list = [
+                starts_dict.get(k, _guess_starting_value(a, b))
+                for k, (a, b) in zip(pars, bounds_list)
+            ]
+            pdf_starts.append(starts_list)
+        yields, *list_of_vals = _fit_mixture(x, pdfs, yields, pdf_bounds, pdf_starts)
+        list_of_kwargs = [
+            {k: v for k, v in zip(pars, vals)}
+            for pars, vals in zip(parameters, list_of_vals)
+        ]
+    else:
+        yields = _fit_mixture_fixed_shape(x, pdfs, yields)
+        list_of_kwargs = [{}] * len(pdfs)
+
+    return yields, list_of_kwargs
+
+
+def _fit_mixture(
+    x: FloatArray,
+    pdfs: List[Density],
+    yields: Optional[Sequence[float]],
+    bounds: List[List[Range]],
+    starts: List[List[float]],
+) -> Tuple[List[float], ...]:
+    slices = [slice(0, len(pdfs))]
+    ipar = len(pdfs)
+    for s in starts:
+        slices.append(slice(ipar, ipar + len(s)))
+        ipar += len(s)
 
     def cost(par: FloatArray) -> np.float64:
+        yields, *pars = (par[sl] for sl in slices)
         fint = 0.0
         f = np.zeros_like(x)
-        for a, pdfx in zip(par, pdfsx):
-            f += a * pdfx
-            fint += a
-        return 2 * (fint - np.sum(safe_log(f)))
+        for y, pdf, par in zip(yields, pdfs, pars):
+            f += y * pdf(x, *par)
+            fint += y
+        r = fint - np.sum(safe_log(f))
+        print(yields, pars, r)
+        return r
 
-    bounds = np.zeros((len(pdfs), 2))
-    bounds[:, 1] = np.inf
-    r = minimize(cost, np.ones(len(pdfs)) * len(x) / len(pdfs), bounds=bounds)
+    if yields is None:
+        yields = _guess_starting_yields(len(x), len(pdfs))
+    yield_bounds = [(0, np.inf) for _ in range(len(pdfs))]
+
+    starts2 = np.append(yields, np.concatenate(starts))
+    bounds2 = np.append(yield_bounds, np.concatenate(bounds, axis=0), axis=0)
+    r = minimize(cost, starts2, bounds=bounds2)
+    if not r.success:
+        msgs = [f"fit failed: {r.message}"]
+        for i, (pdf, y, s, b) in enumerate(zip(pdfs, yields, starts, bounds)):
+            msgs.append(f"pdf {i}: starting yield={y}")
+            for si, bi in zip(s, b):
+                msgs.append(f"  start={si} bounds={bi[0], bi[1]}")
+        raise FitError("\n\t".join(msgs))
+    return tuple(r.x[sl] for sl in slices)
+
+
+def _fit_mixture_fixed_shape(
+    x: FloatArray, pdfs: Sequence[Density], yields: Optional[Sequence[float]]
+) -> List[float]:
+    pdfsx = [pdf(x) for pdf in pdfs]
+
+    def cost(yields: FloatArray) -> np.float64:
+        fint = 0.0
+        f = np.zeros_like(x)
+        for y, pdfx in zip(yields, pdfsx):
+            f += y * pdfx
+            fint += y
+        return fint - np.sum(safe_log(f))
+
+    if yields is None:
+        yields = _guess_starting_yields(len(x), len(pdfs))
+    bounds = [(0, np.inf) for _ in range(len(pdfs))]
+    r = minimize(cost, yields, bounds=bounds)
     if not r.success:
         msg = f"fit failed: {r.message}"
         raise FitError(msg)
-    return r.x  # type:ignore
+    return list(r.x)
+
+
+def _guess_starting_value(a: float, b: float) -> float:
+    if a > -np.inf and b < np.inf:
+        return 0.5 * (a + b)
+    return np.clip(0, a * 1.1 + 1, b * 0.9 - 1)  # type:ignore
+
+
+def _guess_starting_yields(ndata: int, nyields: int) -> List[float]:
+    return [ndata / nyields] * nyields
 
 
 TINY_FLOAT = np.finfo(float).tiny
@@ -368,3 +467,17 @@ TINY_FLOAT = np.finfo(float).tiny
 def safe_log(x: FloatArray) -> FloatArray:
     # guard against x = 0
     return np.log(np.maximum(TINY_FLOAT, x))  # type:ignore
+
+
+def get_pdf_parameters(pdf: Density) -> List[str]:
+    sig = inspect.signature(pdf)
+    names = []
+    for name, par in sig.parameters.items():
+        if par.kind in (
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        ):
+            raise ValueError("pdf contains variable number of arguments")
+        names.append(name)
+    # drop first argument, which is observations
+    return names[1:]

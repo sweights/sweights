@@ -3,10 +3,11 @@
 from scipy.integrate import quad
 from scipy.linalg import solve
 import numpy as np
-from typing import Union, Tuple, Optional, Sequence, List
-from .typing import Density, FloatArray
-from .util import pdf_from_histogram, fit_mixture, FitError
+from typing import Union, Tuple, Optional, Sequence, List, Dict
+from .typing import Density, FloatArray, Range
+from .util import pdf_from_histogram, fit_mixture, FitError, get_pdf_parameters
 import warnings
+from functools import partial
 
 
 class CowsWarning(UserWarning):
@@ -29,9 +30,11 @@ class Cows:
         bpdf: Union[Density, Sequence[Density]],
         norm: Optional[Union[Density, Tuple[FloatArray, FloatArray]]] = None,
         *,
-        range: Optional[Tuple[float, float]] = None,
+        range: Optional[Range] = None,
         summation: Optional[bool] = None,
         yields: Optional[Sequence[float]] = None,
+        bounds: Dict[Density, Dict[str, Range]] = {},
+        starts: Dict[Density, Dict[str, float]] = {},
     ):
         """
         Initialize.
@@ -73,7 +76,12 @@ class Cows:
         yields: sequence of float or None, optional (default is None)
             If this is not None and ``norm`` is None, compute the normalization function
             from the component PDFs and these yields. This can be used to override the
-            otherwise internally computed yields.
+            otherwise internally computed yields. If the PDFs are parametric, this
+            argument is instead used as starting values for the fit.
+        bounds: Dict[Density, Dict[str, Range]], optional
+            Allows to pass parameter bounds to the fitter for each density.
+        starts: Dict[Density, Dict[str, float]], optional
+            Allows to pass parameter starting values to the fitter for each density.
 
         """
         self._sample = sample
@@ -85,6 +93,14 @@ class Cows:
         self._sig = len(spdfs)
         bpdfs = list(bpdf) if isinstance(bpdf, Sequence) else [bpdf]
         self.pdfs = spdfs + bpdfs
+
+        parameters = [get_pdf_parameters(pdf) for pdf in self.pdfs]
+        if any(parameters):
+            if sample is None:
+                raise ValueError("sample cannot be None with parametric pdfs")
+            yields, self.pdfs = _fit_mixture_of_parametric_pdfs(
+                sample, self.pdfs, yields, parameters, bounds, starts
+            )
 
         if isinstance(norm, Sequence):
             xedges, self.norm = _process_histogram_argument(norm, range)
@@ -106,7 +122,7 @@ class Cows:
                         "norm cannot be None if sample is None and yields is None"
                     )
                 try:
-                    yields = fit_mixture(sample, self.pdfs)  # type:ignore
+                    yields = fit_mixture(sample, self.pdfs, yields)  # type:ignore
                 except FitError as e:
                     e.args = (e.args[0] + "; provide norm manually",)
                     raise
@@ -244,3 +260,23 @@ def _compute_w_element(
         result = np.mean(g1x * g2x * varx**-2)
 
     return result
+
+
+def _fit_mixture_of_parametric_pdfs(
+    sample: FloatArray,
+    pdfs: Sequence[Density],
+    yields: Optional[Sequence[float]],
+    parameters: List[List[str]],
+    bounds: Dict[Density, Dict[str, Range]],
+    starts: Dict[Density, Dict[str, float]],
+) -> Tuple[List[float], List[Density]]:
+    fitted_pdfs: List[Density] = []
+    yields, list_of_kwargs = fit_mixture(
+        sample, pdfs, yields, parameters, bounds, starts
+    )
+    for pdf, kwargs in zip(pdfs, list_of_kwargs):
+        if kwargs:
+            fitted_pdfs.append(partial(pdf, **kwargs))
+        else:
+            fitted_pdfs.append(pdf)
+    return yields, fitted_pdfs

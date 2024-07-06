@@ -9,11 +9,26 @@ FloatArray = NDArray[np.floating[Any]]
 
 @runtime_checkable
 class Density(Protocol):
-    """Density type."""
+    """Type that matches densities."""
 
     def __call__(self, x: FloatArray) -> FloatArray:
         """Return density at x."""
         ...
+
+
+## isinstance cannot distinguish between ParametricDensity and Density
+## because the signature is not checked. Perhaps this can be fixed in the future
+## so we keep this protocol around for now.
+#
+# @runtime_checkable
+# class ParametricDensity(Protocol):
+#     """Type that matches densities which have parameters."""
+
+#     def __call__(self, x: FloatArray, arg: float, *args: float) -> FloatArray:
+#         """Return density at x."""
+#         ...
+
+# AnyDensity = Union[Density, ParametricDensity]
 
 
 Range = Tuple[float, float]
