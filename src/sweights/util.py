@@ -18,7 +18,7 @@ from typing import (
     Sequence,
     Dict,
 )
-from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range
+from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range, Cost
 from numpy.typing import ArrayLike
 import inspect
 
@@ -387,6 +387,24 @@ def fit_mixture(
     return yields, list_of_kwargs
 
 
+def _make_cost_parametric_pdfs(
+    x: FloatArray, pdfs: Sequence[Density], slices: List[Any]
+) -> Cost:
+
+    def cost(par: FloatArray) -> np.float64:
+        yields, *pars = (par[sl] for sl in slices)
+        fint = 0.0
+        f = np.zeros_like(x)
+        for y, pdf, par in zip(yields, pdfs, pars):
+            f += y * pdf(x, *par)
+            fint += y
+        r = fint - np.sum(safe_log(f))
+        print(yields, pars, r)
+        return r
+
+    return cost
+
+
 def _fit_mixture(
     x: FloatArray,
     pdfs: List[Density],
@@ -400,16 +418,7 @@ def _fit_mixture(
         slices.append(slice(ipar, ipar + len(s)))
         ipar += len(s)
 
-    def cost(par: FloatArray) -> np.float64:
-        yields, *pars = (par[sl] for sl in slices)
-        fint = 0.0
-        f = np.zeros_like(x)
-        for y, pdf, par in zip(yields, pdfs, pars):
-            f += y * pdf(x, *par)
-            fint += y
-        r = fint - np.sum(safe_log(f))
-        print(yields, pars, r)
-        return r
+    cost = _make_cost_parametric_pdfs(x, pdfs, slices)
 
     if yields is None:
         yields = _guess_starting_yields(len(x), len(pdfs))
@@ -417,7 +426,7 @@ def _fit_mixture(
 
     starts2 = np.append(yields, np.concatenate(starts))
     bounds2 = np.append(yield_bounds, np.concatenate(bounds, axis=0), axis=0)
-    r = minimize(cost, starts2, bounds=bounds2)
+    r = minimize(cost, starts2, bounds=bounds2, method="powell")
     if not r.success:
         msgs = [f"fit failed: {r.message}"]
         for i, (pdf, y, s, b) in enumerate(zip(pdfs, yields, starts, bounds)):
@@ -428,9 +437,7 @@ def _fit_mixture(
     return tuple(r.x[sl] for sl in slices)
 
 
-def _fit_mixture_fixed_shape(
-    x: FloatArray, pdfs: Sequence[Density], yields: Optional[Sequence[float]]
-) -> List[float]:
+def _make_cost_fixed_pdfs(x: FloatArray, pdfs: Sequence[Density]) -> Cost:
     pdfsx = [pdf(x) for pdf in pdfs]
 
     def cost(yields: FloatArray) -> np.float64:
@@ -441,13 +448,23 @@ def _fit_mixture_fixed_shape(
             fint += y
         return fint - np.sum(safe_log(f))
 
+    return cost
+
+
+def _fit_mixture_fixed_shape(
+    x: FloatArray, pdfs: Sequence[Density], yields: Optional[Sequence[float]]
+) -> List[float]:
+    cost = _make_cost_fixed_pdfs(x, pdfs)
+
     if yields is None:
         yields = _guess_starting_yields(len(x), len(pdfs))
     bounds = [(0, np.inf) for _ in range(len(pdfs))]
-    r = minimize(cost, yields, bounds=bounds)
+    r = minimize(cost, yields, bounds=bounds, method="powell")
     if not r.success:
-        msg = f"fit failed: {r.message}"
-        raise FitError(msg)
+        msgs = [f"fit failed: {r.message}"]
+        for i, (pdf, y) in enumerate(zip(pdfs, yields)):
+            msgs.append(f"pdf {i}: starting yield={y}")
+        raise FitError("\n\t".join(msgs))
     return list(r.x)
 
 

@@ -122,7 +122,7 @@ class Cows:
                         "norm cannot be None if sample is None and yields is None"
                     )
                 try:
-                    yields = fit_mixture(sample, self.pdfs, yields)  # type:ignore
+                    yields, _ = fit_mixture(sample, self.pdfs, yields)
                 except FitError as e:
                     e.args = (e.args[0] + "; provide norm manually",)
                     raise
