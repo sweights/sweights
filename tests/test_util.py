@@ -3,6 +3,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 from sweights import util
 from scipy.integrate import quad
+from scipy.stats import norm, expon
 
 
 @pytest.mark.parametrize(
@@ -93,3 +94,63 @@ def test_make_weighted_negative_log_likelihood():
         "b": None,
     }
     assert_allclose(nll(1, 2), ref)
+
+
+def test_fit_mixture_1():
+    rng = np.random.default_rng(1)
+    d1 = expon(0, 0.5)
+    d2 = norm(0.5, 0.1)
+    x1 = d1.rvs(100, random_state=rng)
+    x2 = d2.rvs(200, random_state=rng)
+    x = np.append(x1, x2)
+    yields, list_of_kwargs = util.fit_mixture(x, (d1.pdf, d2.pdf))
+    assert_allclose(yields, (100, 200), atol=5)
+    assert list_of_kwargs == [{}, {}]
+
+
+def test_fit_mixture_2():
+    rng = np.random.default_rng(1)
+
+    def pdf1(x, slope):
+        return expon.pdf(x, 0, slope)
+
+    def pdf2(x, mu, sigma):
+        return norm.pdf(x, mu, sigma)
+
+    x1 = expon(0, 0.5).rvs(1000, random_state=rng)
+    x2 = norm(0.5, 0.1).rvs(2000, random_state=rng)
+    x = np.append(x1, x2)
+
+    def model(x, y1, y2, slope, mu, sigma):
+        return y1 + y2, y1 * pdf1(x, slope) + y2 * pdf2(x, mu, sigma)
+
+    from iminuit import Minuit
+    from iminuit.cost import ExtendedUnbinnedNLL
+
+    c = ExtendedUnbinnedNLL(x, model)
+    mi = Minuit(c, 1100, 1800, 0.4, 0.4, 0.2)
+    mi.strategy = 0
+    mi.migrad()
+    print(mi)
+
+    yields, list_of_kwargs = util.fit_mixture(
+        x,
+        (pdf1, pdf2),
+        (1100, 1800),
+        [["slope"], ["mu", "sigma"]],
+        {pdf1: {"slope": (0.01, 2.0)}, pdf2: {"mu": (0, 1), "sigma": (1e-3, 2)}},
+        {pdf1: {"slope": 0.4}, pdf2: {"mu": 0.4, "sigma": 0.2}},
+    )
+    assert_allclose(yields, (1000, 2000), atol=10)
+    assert [list(kw) for kw in list_of_kwargs] == [["slope"], ["mu", "sigma"]]
+    assert_allclose(list_of_kwargs[0]["slope"], 0.5, atol=0.01)
+    assert_allclose(list_of_kwargs[1]["mu"], 0.5, atol=0.01)
+    assert_allclose(list_of_kwargs[1]["sigma"], 0.1, atol=0.01)
+
+
+def test_get_pdf_parameters():
+    def pdf1(x, mu, sigma): ...
+    def pdf2(x): ...
+
+    assert util.get_pdf_parameters(pdf1) == ["mu", "sigma"]
+    assert util.get_pdf_parameters(pdf2) == []

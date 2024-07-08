@@ -5,10 +5,23 @@ import numpy as np
 from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from scipy.integrate import quad
 from scipy.special import comb
+from scipy.stats import chi2
+from scipy.optimize import minimize
 import warnings
-from typing import Tuple, Optional, Union, Any, TYPE_CHECKING, List, Callable
-from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range
+from typing import (
+    Tuple,
+    Optional,
+    Union,
+    Any,
+    TYPE_CHECKING,
+    List,
+    Callable,
+    Sequence,
+    Dict,
+)
+from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range, Cost
 from numpy.typing import ArrayLike
+import inspect
 
 __all__ = [
     "convert_rf_pdf",
@@ -318,8 +331,6 @@ def make_weighted_negative_log_likelihood(
 ) -> Callable[..., float]:
     """Construct weighted log-likelihood function compatible with iminuit."""
     util = import_optional_module("iminuit.util")
-    cost = import_optional_module("iminuit.cost")
-    safe_log = cost._safe_log
 
     parameters = {}
     first = True
@@ -337,3 +348,196 @@ def make_weighted_negative_log_likelihood(
     nll._parameters = parameters  # type:ignore
 
     return nll
+
+
+class FitError(RuntimeError):
+    pass
+
+
+def fit_mixture(
+    x: FloatArray,
+    pdfs: Sequence[Density],
+    yields: Optional[Sequence[float]] = None,
+    parameters: List[List[str]] = [],
+    bounds: Dict[Density, Dict[str, Range]] = {},
+    starts: Dict[Density, Dict[str, float]] = {},
+) -> Tuple[List[float], List[Dict[str, float]]]:
+    pdfs = list(pdfs)
+    if any(parameters):
+        pdf_bounds = []
+        pdf_starts = []
+        for pdf, pars in zip(pdfs, parameters):
+            bounds_dict = bounds.get(pdf, {})
+            starts_dict = starts.get(pdf, {})
+            bounds_list = [bounds_dict.get(k, (-np.inf, np.inf)) for k in pars]
+            pdf_bounds.append(bounds_list)
+            starts_list = [
+                starts_dict.get(k, _guess_starting_value(a, b))
+                for k, (a, b) in zip(pars, bounds_list)
+            ]
+            pdf_starts.append(starts_list)
+        yields, *list_of_vals = _fit_mixture(x, pdfs, yields, pdf_bounds, pdf_starts)
+        list_of_kwargs = [
+            {k: v for k, v in zip(pars, vals)}
+            for pars, vals in zip(parameters, list_of_vals)
+        ]
+    else:
+        yields = _fit_mixture_fixed_shape(x, pdfs, yields)
+        list_of_kwargs = [{}] * len(pdfs)
+
+    return yields, list_of_kwargs
+
+
+def _make_cost_parametric_pdfs(
+    x: FloatArray, pdfs: Sequence[Density], slices: List[Any]
+) -> Cost:
+
+    def cost(par: FloatArray) -> np.float64:
+        yields, *pars = (par[sl] for sl in slices)
+        fint = 0.0
+        f = np.zeros_like(x)
+        for y, pdf, par in zip(yields, pdfs, pars):
+            f += y * pdf(x, *par)
+            fint += y
+        r = fint - np.sum(safe_log(f))
+        return r
+
+    return cost
+
+
+def _fit_mixture(
+    x: FloatArray,
+    pdfs: List[Density],
+    yields: Optional[Sequence[float]],
+    bounds: List[List[Range]],
+    starts: List[List[float]],
+) -> Tuple[List[float], ...]:
+    slices = [slice(0, len(pdfs))]
+    ipar = len(pdfs)
+    for s in starts:
+        slices.append(slice(ipar, ipar + len(s)))
+        ipar += len(s)
+
+    cost = _make_cost_parametric_pdfs(x, pdfs, slices)
+
+    if yields is None:
+        yields = _guess_starting_yields(len(x), len(pdfs))
+    yield_bounds = [(0, np.inf) for _ in range(len(pdfs))]
+
+    starts2 = np.append(yields, np.concatenate(starts))
+    bounds2 = np.append(yield_bounds, np.concatenate(bounds, axis=0), axis=0)
+    r = minimize(cost, starts2, bounds=bounds2, method="powell", options={"ftol": 0})
+    if not r.success:
+        msgs = [f"fit failed: {r.message}"]
+        for i, (pdf, y, s, b) in enumerate(zip(pdfs, yields, starts, bounds)):
+            msgs.append(f"pdf {i}: starting yield={y}")
+            for si, bi in zip(s, b):
+                msgs.append(f"  start={si} bounds={bi[0], bi[1]}")
+        raise FitError("\n\t".join(msgs))
+    return tuple(r.x[sl] for sl in slices)
+
+
+def _make_cost_fixed_pdfs(x: FloatArray, pdfs: Sequence[Density]) -> Cost:
+    pdfsx = [pdf(x) for pdf in pdfs]
+
+    def cost(yields: FloatArray) -> np.float64:
+        fint = 0.0
+        f = np.zeros_like(x)
+        for y, pdfx in zip(yields, pdfsx):
+            f += y * pdfx
+            fint += y
+        return fint - np.sum(safe_log(f))
+
+    return cost
+
+
+def _fit_mixture_fixed_shape(
+    x: FloatArray, pdfs: Sequence[Density], yields: Optional[Sequence[float]]
+) -> List[float]:
+    cost = _make_cost_fixed_pdfs(x, pdfs)
+
+    if yields is None:
+        yields = _guess_starting_yields(len(x), len(pdfs))
+    bounds = [(0, np.inf) for _ in range(len(pdfs))]
+    r = minimize(cost, yields, bounds=bounds, method="powell", options={"ftol": 0})
+    if not r.success:
+        msgs = [f"fit failed: {r.message}"]
+        for i, (pdf, y) in enumerate(zip(pdfs, yields)):
+            msgs.append(f"pdf {i}: starting yield={y}")
+        raise FitError("\n\t".join(msgs))
+    return list(r.x)
+
+
+def _guess_starting_value(a: float, b: float) -> float:
+    if a > -np.inf and b < np.inf:
+        return 0.5 * (a + b)
+    return np.clip(0, a * 1.1 + 1, b * 0.9 - 1)  # type:ignore
+
+
+def _guess_starting_yields(ndata: int, nyields: int) -> List[float]:
+    return [ndata / nyields] * nyields
+
+
+TINY_FLOAT = np.finfo(float).tiny
+
+
+def safe_log(x: FloatArray) -> FloatArray:
+    # guard against x = 0
+    return np.log(np.maximum(TINY_FLOAT, x))  # type:ignore
+
+
+def get_pdf_parameters(pdf: Density) -> List[str]:
+    sig = inspect.signature(pdf)
+    names = []
+    for name, par in sig.parameters.items():
+        if par.kind in (
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        ):
+            raise ValueError("pdf contains variable number of arguments")
+        names.append(name)
+    # drop first argument, which is observations
+    return names[1:]
+
+
+class GofWarning(UserWarning):
+    """Warning emitted if the goodness-of-fit test fails or cannot be carried out."""
+
+
+def gof_pvalue(x: FloatArray, pdf: Density, nfit: int) -> float:
+    ntot = len(x)
+    bins = min(100, ntot // 10)
+    if bins < 2:
+        warnings.warn("not enough bins to perform test", GofWarning)
+        return np.nan
+
+    edges = np.quantile(x, np.linspace(0, 1, bins + 1))
+    counts = np.histogram(x, bins=edges)[0]
+
+    # Compute integral over pdf with Simpson's rule to exploit
+    # vectorization, but fall back to numerical integration if
+    # result differs too much from simple mid-point integration.
+    # "Too much" in this context is taken to be more than 1e-3
+    # relative deviation.
+    pe = pdf(edges)
+    pa = pe[:-1]
+    pb = pe[1:]
+    dx = np.diff(edges)
+    pm = pdf(edges[:-1] + 0.5 * dx)
+    pn = dx / 6 * (pa + 4 * pm + pb)
+    mask = np.abs(pn - dx * pm) > 1e-3 * pn
+    for i in np.arange(bins)[mask]:
+        pn[i] = _quad_workaround(pdf, *edges[i : i + 2])
+
+    # G-test, test statistic is asymptotically chi-square distributed
+    g = np.sum(2 * counts * np.log(counts / (pn * ntot)))
+    return chi2(bins - nfit).sf(g)  # type:ignore
+
+
+def _quad_workaround(
+    fn: Callable[[FloatArray], FloatArray], a: float, b: float
+) -> float:
+    def wrapped(x: float) -> float:
+        return fn(np.atleast_1d(x))[0]  # type:ignore
+
+    return quad(wrapped, a, b)[0]  # type:ignore

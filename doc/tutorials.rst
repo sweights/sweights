@@ -10,3 +10,4 @@ Tutorials
     notebooks/factorization_test
     notebooks/tutorial_factorization_violation
     notebooks/roopdf_conversion
+    notebooks/tutorial_experimental
