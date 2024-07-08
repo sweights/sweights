@@ -5,6 +5,7 @@ import numpy as np
 from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from scipy.integrate import quad
 from scipy.special import comb
+from scipy.stats import chi2
 from scipy.optimize import minimize
 import warnings
 from typing import (
@@ -399,7 +400,6 @@ def _make_cost_parametric_pdfs(
             f += y * pdf(x, *par)
             fint += y
         r = fint - np.sum(safe_log(f))
-        print(yields, pars, r)
         return r
 
     return cost
@@ -426,7 +426,7 @@ def _fit_mixture(
 
     starts2 = np.append(yields, np.concatenate(starts))
     bounds2 = np.append(yield_bounds, np.concatenate(bounds, axis=0), axis=0)
-    r = minimize(cost, starts2, bounds=bounds2, method="powell")
+    r = minimize(cost, starts2, bounds=bounds2, method="powell", options={"ftol": 0})
     if not r.success:
         msgs = [f"fit failed: {r.message}"]
         for i, (pdf, y, s, b) in enumerate(zip(pdfs, yields, starts, bounds)):
@@ -459,7 +459,7 @@ def _fit_mixture_fixed_shape(
     if yields is None:
         yields = _guess_starting_yields(len(x), len(pdfs))
     bounds = [(0, np.inf) for _ in range(len(pdfs))]
-    r = minimize(cost, yields, bounds=bounds, method="powell")
+    r = minimize(cost, yields, bounds=bounds, method="powell", options={"ftol": 0})
     if not r.success:
         msgs = [f"fit failed: {r.message}"]
         for i, (pdf, y) in enumerate(zip(pdfs, yields)):
@@ -498,3 +498,46 @@ def get_pdf_parameters(pdf: Density) -> List[str]:
         names.append(name)
     # drop first argument, which is observations
     return names[1:]
+
+
+class GofWarning(UserWarning):
+    """Warning emitted if the goodness-of-fit test fails or cannot be carried out."""
+
+
+def gof_pvalue(x: FloatArray, pdf: Density, nfit: int) -> float:
+    ntot = len(x)
+    bins = min(100, ntot // 10)
+    if bins < 2:
+        warnings.warn("not enough bins to perform test", GofWarning)
+        return np.nan
+
+    edges = np.quantile(x, np.linspace(0, 1, bins + 1))
+    counts = np.histogram(x, bins=edges)[0]
+
+    # Compute integral over pdf with Simpson's rule to exploit
+    # vectorization, but fall back to numerical integration if
+    # result differs too much from simple mid-point integration.
+    # "Too much" in this context is taken to be more than 1e-3
+    # relative deviation.
+    pe = pdf(edges)
+    pa = pe[:-1]
+    pb = pe[1:]
+    dx = np.diff(edges)
+    pm = pdf(edges[:-1] + 0.5 * dx)
+    pn = dx / 6 * (pa + 4 * pm + pb)
+    mask = np.abs(pn - dx * pm) > 1e-3 * pn
+    for i in np.arange(bins)[mask]:
+        pn[i] = _quad_workaround(pdf, *edges[i : i + 2])
+
+    # G-test, test statistic is asymptotically chi-square distributed
+    g = np.sum(2 * counts * np.log(counts / (pn * ntot)))
+    return chi2(bins - nfit).sf(g)  # type:ignore
+
+
+def _quad_workaround(
+    fn: Callable[[FloatArray], FloatArray], a: float, b: float
+) -> float:
+    def wrapped(x: float) -> float:
+        return fn(np.atleast_1d(x))[0]  # type:ignore
+
+    return quad(wrapped, a, b)[0]  # type:ignore

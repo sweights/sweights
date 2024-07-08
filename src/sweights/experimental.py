@@ -1,11 +1,18 @@
 """Implementation of the new v2 interface for COWs and sWeights classes."""
 
-from scipy.integrate import quad
 from scipy.linalg import solve
 import numpy as np
 from typing import Union, Tuple, Optional, Sequence, List, Dict
 from .typing import Density, FloatArray, Range
-from .util import pdf_from_histogram, fit_mixture, FitError, get_pdf_parameters
+from .util import (
+    pdf_from_histogram,
+    fit_mixture,
+    FitError,
+    get_pdf_parameters,
+    _quad_workaround,
+    gof_pvalue,
+    GofWarning,
+)
 import warnings
 from functools import partial
 
@@ -19,6 +26,7 @@ class Cows:
 
     pdfs: List[Density]
     var: Density
+    yields: Optional[Sequence[float]]
     _sample: Optional[FloatArray]
     _am: FloatArray
     _sig: int
@@ -35,6 +43,7 @@ class Cows:
         yields: Optional[Sequence[float]] = None,
         bounds: Dict[Density, Dict[str, Range]] = {},
         starts: Dict[Density, Dict[str, float]] = {},
+        validate_input: bool = True,
     ):
         """
         Initialize.
@@ -78,10 +87,17 @@ class Cows:
             from the component PDFs and these yields. This can be used to override the
             otherwise internally computed yields. If the PDFs are parametric, this
             argument is instead used as starting values for the fit.
-        bounds: Dict[Density, Dict[str, Range]], optional
+        bounds: Dict[Density, Dict[str, Range]], optional (default is {})
             Allows to pass parameter bounds to the fitter for each density.
-        starts: Dict[Density, Dict[str, float]], optional
+        starts: Dict[Density, Dict[str, float]], optional (default is {})
             Allows to pass parameter starting values to the fitter for each density.
+        validate_input: bool, optional (default is True)
+            Whether to validate the input with a goodness-of-fit test. Applying COWs
+            requires that the PDFs indeed describe the observed distribution. Using the
+            summation method further requires that the ``norm`` function is an unbiased
+            estimate of the observed distribution. The goodness-of-fit test tests this
+            requirement and raises a warning if the test fails. You can speed up the
+            computation by setting this to False and skip the test.
 
         """
         self._sample = sample
@@ -95,13 +111,14 @@ class Cows:
         self.pdfs = spdfs + bpdfs
 
         parameters = [get_pdf_parameters(pdf) for pdf in self.pdfs]
+        nfit = -1
         if any(parameters):
             if sample is None:
                 raise ValueError("sample cannot be None with parametric pdfs")
             yields, self.pdfs = _fit_mixture_of_parametric_pdfs(
                 sample, self.pdfs, yields, parameters, bounds, starts
             )
-
+            nfit = sum((len(p) for p in parameters), len(yields))
         if isinstance(norm, Sequence):
             xedges, self.norm = _process_histogram_argument(norm, range)
         elif isinstance(norm, Density):
@@ -114,6 +131,7 @@ class Cows:
                 )
             xedges = np.array(range)
             self.norm = norm
+            nfit = 0
         elif norm is None:
             xedges = np.array(range)
             if yields is None:
@@ -124,11 +142,14 @@ class Cows:
                 try:
                     yields, _ = fit_mixture(sample, self.pdfs, yields)
                 except FitError as e:
-                    e.args = (e.args[0] + "; provide norm manually",)
+                    e.args = (
+                        f"{e.args[0]}; try to add bounds and good starting values "
+                        "or fit norm manually",
+                    )
                     raise
 
             assert yields is not None
-            yields_sum: float = sum(yields)
+            yields_sum = sum(yields, 0.0)
 
             def fn(x: FloatArray) -> FloatArray:
                 r = np.zeros_like(x)
@@ -137,6 +158,7 @@ class Cows:
                 return r
 
             self.norm = fn
+            nfit = len(yields)
         else:
             msg = f"var type {type(norm)} not recognized, see docs for valid types"
             raise ValueError(msg)
@@ -148,6 +170,19 @@ class Cows:
 
         if summation is False:
             sample = None
+
+        # If sample is not None here, summation technique is used to compute the W
+        # matrix, which requires that norm is an estimate of the total pdf. We test this
+        # with a GoF. No test is performed if norm derived from a histogram.
+        if validate_input and sample is not None and nfit >= 0:
+            assert len(xedges) == 2  # required by numerical integration in gof_pvalue
+            pgof = gof_pvalue(sample, self.norm, nfit)
+            if pgof < 0.01:
+                msg = (
+                    f"goodness-of-fit test produces small p-value ({pgof:.2g}), "
+                    "check fit result"
+                )
+                warnings.warn(msg, GofWarning)
 
         # we must pass sample here, not self._sample, because sample may be set to None
         w = _compute_lower_w_matrix(self.pdfs, self.norm, xedges, sample)
@@ -162,6 +197,7 @@ class Cows:
             overwrite_b=True,
             assume_a="pos",
         )
+        self.yields = yields
 
     def component(self, idx: int, x: Optional[FloatArray] = None) -> FloatArray:
         """
@@ -189,6 +225,7 @@ class Cows:
 
         w = np.zeros_like(x)
         nx = self.norm(x)
+        nx[nx == 0] = np.nan
         irange = range(self._sig) if idx < 0 else range(idx, idx + 1)
         for i in irange:
             # we compute only one pdf[k](x) array at a time, because x may be large
@@ -248,10 +285,8 @@ def _compute_w_element(
             return g1(m) * g2(m) / var(m)
 
         result = np.float64(0)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            for x0, x1 in zip(xedges[:-1], xedges[1:]):
-                result += quad(fn, x0, x1)[0]
+        for x0, x1 in zip(xedges[:-1], xedges[1:]):
+            result += _quad_workaround(fn, x0, x1)
 
     else:
         g1x = g1(sample)
