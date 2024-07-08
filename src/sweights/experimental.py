@@ -55,8 +55,8 @@ class Cows:
             via summation. If ``sample`` is None, COWs are computed with via
             integration. COWs may be computed via integration also if we cannot
             guarantee that summation works correctly, as summation requires that
-            ``norm`` is the total density. You can overwrite the automated choice via
-            ``summation``.
+            ``norm`` is an unbiased estimate of the the total density. You can overwrite
+            the automated choice via ``summation``.
         spdf: callable or sequence of callable
             Signal PDF in the discriminant variable. Must accept an array-like argument
             and return an array. The PDF must be normalized over the sample range. This
@@ -78,10 +78,10 @@ class Cows:
             Integration range to use if COWs are computed via integration. If range is
             None, and ``sample`` is not None, the range is computed from the sample.
         summation: bool or None, optional (default is None)
-            If this is None, use summation if possible unless the user provides an
-            external normalization function with ``norm``, then we cannot guarantee that
-            summation is possible. Setting this to True enforces summation and setting
-            it to False enforces integration.
+            If this is None, use summation (only possible if ``sample`` is set) unless
+            the user provides an external normalization function with ``norm``, then we
+            cannot guarantee that summation is possible. Setting this to True enforces
+            summation and setting it to False enforces integration.
         yields: sequence of float or None, optional (default is None)
             If this is not None and ``norm`` is None, compute the normalization function
             from the component PDFs and these yields. This can be used to override the
@@ -93,11 +93,12 @@ class Cows:
             Allows to pass parameter starting values to the fitter for each density.
         validate_input: bool, optional (default is True)
             Whether to validate the input with a goodness-of-fit test. Applying COWs
-            requires that the PDFs indeed describe the observed distribution. Using the
-            summation method further requires that the ``norm`` function is an unbiased
-            estimate of the observed distribution. The goodness-of-fit test tests this
-            requirement and raises a warning if the test fails. You can speed up the
-            computation by setting this to False and skip the test.
+            requires that the component PDFs indeed describe the observed distribution.
+            Using the summation method further requires that the ``norm`` function is an
+            unbiased estimate of the observed distribution. The goodness-of-fit test is
+            able to detect violations of these requirements and emits a warning if the
+            test fails. You can speed up the computation by setting this to False and
+            skip the test.
 
         """
         self._sample = sample
