@@ -132,7 +132,11 @@ class Cows:
             xedges = np.array(range)
             has_parameters = any(get_pdf_parameters(pdf) for pdf in self.pdfs)
             if yields is None or has_parameters:
-                assert sample is not None
+                if sample is None:
+                    msg = (
+                        "sample cannot be None if norm is None and pdfs have parameters"
+                    )
+                    raise ValueError(msg)
                 yields, self.pdfs, nfit = _fit_mixture(
                     sample, self.pdfs, yields, bounds, starts
                 )
