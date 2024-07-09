@@ -20,8 +20,8 @@ from typing import (
 )
 from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range, Cost
 from numpy.typing import ArrayLike, NDArray
-import inspect
 from iminuit import Minuit
+from iminuit.util import describe
 
 __all__ = [
     "convert_rf_pdf",
@@ -31,7 +31,6 @@ __all__ = [
     "BernsteinBasisPdf",
     "make_bernstein_pdf",
     "make_weighted_negative_log_likelihood",
-    "get_pdf_parameters",
 ]
 
 
@@ -331,11 +330,9 @@ def make_weighted_negative_log_likelihood(
     model: Callable[..., FloatArray],
 ) -> Callable[..., float]:
     """Construct weighted log-likelihood function compatible with iminuit."""
-    util = import_optional_module("iminuit.util")
-
     parameters = {}
     first = True
-    for par, limits in util.describe(model, annotations=True).items():
+    for par, limits in describe(model, annotations=True).items():
         if first:
             first = False
             continue
@@ -365,7 +362,7 @@ def fit_mixture(
     pdfs = list(pdfs)
     if yields is not None:
         yields = list(yields)
-    parameters = [get_pdf_parameters(pdf) for pdf in pdfs]
+    parameters = [_get_pdf_parameters(pdf) for pdf in pdfs]
     pdf_bounds = []
     pdf_starts = []
     if any(parameters):
@@ -477,58 +474,6 @@ def safe_log(x: FloatArray) -> FloatArray:
     return np.log(np.maximum(TINY_FLOAT, x))  # type:ignore
 
 
-def get_pdf_parameters(pdf: Density) -> Dict[str, Tuple[float, float]]:
-    """
-    Return a dict of parameter names and bounds from a parametric density.
-
-    Accepts are parametric density function and extracts the names of the parameters
-    (all arguments after the first) and parameter limits, if the parameters are
-    annotated. The density may not contain a variable number of position-only or
-    keyword-only arguments. A ValueError is raised if such a density is passed.
-
-    Annotations of the following kind are accepted:
-    - annotated-types: Gt, Ge, Lt, Le, Interval
-    - Tuple(float, float): Lower and upper bound on the parameter. Can be infinity.
-    """
-    sig = inspect.signature(pdf, eval_str=True)
-    parameters = {}
-    first = True
-    for name, par in sig.parameters.items():
-        # drop first argument, which is observations
-        if first:
-            first = False
-            continue
-        if par.kind in (
-            inspect.Parameter.VAR_POSITIONAL,
-            inspect.Parameter.VAR_KEYWORD,
-        ):
-            raise ValueError("pdf contains variable number of arguments")
-        bound = (-np.inf, np.inf)
-        if par.annotation is not None:
-            metadata = getattr(par.annotation, "__metadata__", None)
-            if metadata is not None:
-                lower = -np.inf
-                upper = np.inf
-                for item in metadata:
-                    if isinstance(item, Sequence):
-                        if len(item) == 2:
-                            lower, upper = item
-                            continue
-                    lower = _getattrs(item, ("gt", "ge"), lower)
-                    upper = _getattrs(item, ("lt", "le"), upper)
-                bound = lower, upper
-        parameters[name] = bound
-    return parameters
-
-
-def _getattrs(obj: Any, keys: Sequence[str], default: Any) -> Any:
-    for key in keys:
-        val = getattr(obj, key, None)
-        if val is not None:
-            return val
-    return default
-
-
 class GofWarning(UserWarning):
     """Warning emitted if the goodness-of-fit test fails or cannot be carried out."""
 
@@ -570,3 +515,25 @@ def _quad_workaround(
         return fn(np.atleast_1d(x))[0]  # type:ignore
 
     return quad(wrapped, a, b)[0]  # type:ignore
+
+
+def _get_pdf_parameters(fn: Density) -> Dict[str, Range]:
+    """
+    Return PDF paramters as dict with limits.
+
+    The first parameter is skipped, which is the observation.
+    """
+    result = describe(fn, annotations=True)
+    items = iter(result.items())
+    next(items)  # skip first entry
+    return {
+        k: (
+            (-np.inf, np.inf)
+            if lim is None
+            else (
+                -np.inf if lim[0] is None else lim[0],
+                np.inf if lim[1] is None else lim[1],
+            )
+        )
+        for (k, lim) in items
+    }

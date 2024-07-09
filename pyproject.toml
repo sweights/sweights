@@ -24,13 +24,7 @@ classifiers = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-test = [
-    "pytest",
-    "pytest-cov",
-    "coverage[toml]",
-    "matplotlib",
-    "annotated-types",
-]
+test = ["pytest", "pytest-cov", "coverage[toml]", "matplotlib"]
 doc = [
     "ipython",
     "nbsphinx",

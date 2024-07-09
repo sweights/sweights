@@ -7,8 +7,8 @@ from .typing import Density, FloatArray, Range
 from .util import (
     pdf_from_histogram,
     fit_mixture,
-    get_pdf_parameters,
     _quad_workaround,
+    _get_pdf_parameters,
     gof_pvalue,
     GofWarning,
 )
@@ -130,7 +130,7 @@ class Cows:
                     "norm cannot be None if sample is None and yields is None"
                 )
             xedges = np.array(range)
-            has_parameters = any(get_pdf_parameters(pdf) for pdf in self.pdfs)
+            has_parameters = any(_get_pdf_parameters(pdf) for pdf in self.pdfs)
             if yields is None or has_parameters:
                 if sample is None:
                     msg = (
