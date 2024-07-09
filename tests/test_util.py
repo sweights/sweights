@@ -4,6 +4,7 @@ from numpy.testing import assert_allclose
 from sweights import util
 from scipy.integrate import quad
 from scipy.stats import norm, expon
+from typing import Annotated
 
 
 @pytest.mark.parametrize(
@@ -114,7 +115,7 @@ def test_fit_mixture_2():
     def pdf1(x, slope):
         return expon.pdf(x, 0, slope)
 
-    def pdf2(x, mu, sigma):
+    def pdf2(x, mu: Annotated[float, (0, 1)], sigma: Annotated[float, (1e-3, 2)]):
         return norm.pdf(x, mu, sigma)
 
     x1 = expon(0, 0.5).rvs(1000, random_state=rng)
@@ -131,14 +132,13 @@ def test_fit_mixture_2():
     mi = Minuit(c, 1100, 1800, 0.4, 0.4, 0.2)
     mi.strategy = 0
     mi.migrad()
-    print(mi)
+    assert mi.valid
 
     yields, list_of_kwargs = util.fit_mixture(
         x,
         (pdf1, pdf2),
         (1100, 1800),
-        [["slope"], ["mu", "sigma"]],
-        {pdf1: {"slope": (0.01, 2.0)}, pdf2: {"mu": (0, 1), "sigma": (1e-3, 2)}},
+        {pdf1: {"slope": (0.01, 2.0)}},
         {pdf1: {"slope": 0.4}, pdf2: {"mu": 0.4, "sigma": 0.2}},
     )
     assert_allclose(yields, (1000, 2000), atol=10)
@@ -148,9 +148,47 @@ def test_fit_mixture_2():
     assert_allclose(list_of_kwargs[1]["sigma"], 0.1, atol=0.01)
 
 
+def test_fit_mixture_3():
+    rng = np.random.default_rng(1)
+
+    def pdf1(x, slope):
+        return expon.pdf(x, 0, slope)
+
+    def pdf2(x, mu: Annotated[float, (0, 1)], sigma: Annotated[float, (-1, 0)]):
+        return norm.pdf(x, mu, sigma)
+
+    x1 = expon(0, 0.5).rvs(1000, random_state=rng)
+    x2 = norm(0.5, 0.1).rvs(2000, random_state=rng)
+    x = np.append(x1, x2)
+
+    from sweights.util import FitError
+
+    with pytest.raises(
+        FitError, match=r"│ *4 *│ *x4 *│ *\-0\.5 *│*[^|]*│ *│ *│ *\-1 *│ *0 *│ *│"
+    ):
+        util.fit_mixture(x, (pdf1, pdf2), (1100, 1800), {pdf1: {"slope": (0.01, 2.0)}})
+
+
 def test_get_pdf_parameters():
-    def pdf1(x, mu, sigma): ...
+    at = pytest.importorskip("annotated_types")
+
+    def pdf1(
+        x,
+        mu: Annotated[float, at.Lt(5)],
+        sigma: Annotated[float, at.Interval(gt=1e-3, lt=0.9)],
+        foo: float,
+        bar: Annotated[float, (-1, 2)],
+        baz,
+        y: Annotated[float, at.Lt(3), at.Gt(1)],
+    ): ...
     def pdf2(x): ...
 
-    assert util.get_pdf_parameters(pdf1) == ["mu", "sigma"]
-    assert util.get_pdf_parameters(pdf2) == []
+    assert util.get_pdf_parameters(pdf1) == {
+        "mu": (-np.inf, 5),
+        "sigma": (1e-3, 0.9),
+        "foo": (-np.inf, np.inf),
+        "bar": (-1, 2),
+        "baz": (-np.inf, np.inf),
+        "y": (1, 3),
+    }
+    assert util.get_pdf_parameters(pdf2) == {}

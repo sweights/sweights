@@ -6,7 +6,6 @@ from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from scipy.integrate import quad
 from scipy.special import comb
 from scipy.stats import chi2
-from scipy.optimize import minimize
 import warnings
 from typing import (
     Tuple,
@@ -20,8 +19,9 @@ from typing import (
     Dict,
 )
 from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range, Cost
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 import inspect
+from iminuit import Minuit
 
 __all__ = [
     "convert_rf_pdf",
@@ -31,6 +31,7 @@ __all__ = [
     "BernsteinBasisPdf",
     "make_bernstein_pdf",
     "make_weighted_negative_log_likelihood",
+    "get_pdf_parameters",
 ]
 
 
@@ -358,33 +359,35 @@ def fit_mixture(
     x: FloatArray,
     pdfs: Sequence[Density],
     yields: Optional[Sequence[float]] = None,
-    parameters: List[List[str]] = [],
     bounds: Dict[Density, Dict[str, Range]] = {},
     starts: Dict[Density, Dict[str, float]] = {},
 ) -> Tuple[List[float], List[Dict[str, float]]]:
     pdfs = list(pdfs)
+    if yields is not None:
+        yields = list(yields)
+    parameters = [get_pdf_parameters(pdf) for pdf in pdfs]
+    pdf_bounds = []
+    pdf_starts = []
     if any(parameters):
-        pdf_bounds = []
-        pdf_starts = []
         for pdf, pars in zip(pdfs, parameters):
             bounds_dict = bounds.get(pdf, {})
             starts_dict = starts.get(pdf, {})
-            bounds_list = [bounds_dict.get(k, (-np.inf, np.inf)) for k in pars]
+            # bounds argument has precedence over bounds from annotations
+            bounds_list = [bounds_dict.get(k, pars[k]) for k in pars]
             pdf_bounds.append(bounds_list)
             starts_list = [
                 starts_dict.get(k, _guess_starting_value(a, b))
                 for k, (a, b) in zip(pars, bounds_list)
             ]
             pdf_starts.append(starts_list)
-        yields, *list_of_vals = _fit_mixture(x, pdfs, yields, pdf_bounds, pdf_starts)
+    yields, *list_of_vals = _fit_mixture(x, pdfs, yields, pdf_bounds, pdf_starts)
+    if list_of_vals:
         list_of_kwargs = [
             {k: v for k, v in zip(pars, vals)}
             for pars, vals in zip(parameters, list_of_vals)
         ]
     else:
-        yields = _fit_mixture_fixed_shape(x, pdfs, yields)
-        list_of_kwargs = [{}] * len(pdfs)
-
+        list_of_kwargs = [{}] * len(yields)
     return yields, list_of_kwargs
 
 
@@ -408,33 +411,38 @@ def _make_cost_parametric_pdfs(
 def _fit_mixture(
     x: FloatArray,
     pdfs: List[Density],
-    yields: Optional[Sequence[float]],
+    yield_starts: Optional[List[float]],
     bounds: List[List[Range]],
     starts: List[List[float]],
-) -> Tuple[List[float], ...]:
+) -> List[List[float]]:
+    assert len(bounds) == len(starts)
     slices = [slice(0, len(pdfs))]
     ipar = len(pdfs)
     for s in starts:
         slices.append(slice(ipar, ipar + len(s)))
         ipar += len(s)
 
-    cost = _make_cost_parametric_pdfs(x, pdfs, slices)
+    if len(slices) > 1:
+        cost = _make_cost_parametric_pdfs(x, pdfs, slices)
+    else:
+        cost = _make_cost_fixed_pdfs(x, pdfs)
 
-    if yields is None:
-        yields = _guess_starting_yields(len(x), len(pdfs))
+    if yield_starts is None:
+        yield_starts = _guess_starting_yields(len(x), len(pdfs))
     yield_bounds = [(0, np.inf) for _ in range(len(pdfs))]
 
-    starts2 = np.append(yields, np.concatenate(starts))
-    bounds2 = np.append(yield_bounds, np.concatenate(bounds, axis=0), axis=0)
-    r = minimize(cost, starts2, bounds=bounds2, method="powell", options={"ftol": 0})
-    if not r.success:
-        msgs = [f"fit failed: {r.message}"]
-        for i, (pdf, y, s, b) in enumerate(zip(pdfs, yields, starts, bounds)):
-            msgs.append(f"pdf {i}: starting yield={y}")
-            for si, bi in zip(s, b):
-                msgs.append(f"  start={si} bounds={bi[0], bi[1]}")
-        raise FitError("\n\t".join(msgs))
-    return tuple(r.x[sl] for sl in slices)
+    starts2: NDArray[np.float64] = np.concatenate([yield_starts] + starts)
+    bounds2: NDArray[np.float64] = np.concatenate(
+        [yield_bounds] + bounds, axis=0  # type:ignore
+    )
+    min = Minuit(cost, starts2)
+    min.strategy = 0  # exact uncertainties are irrelevant
+    min.limits = bounds2
+    min.migrad()
+    if not min.valid:
+        msgs = ["fit failed", f"{min.fmin}", f"{min.params}"]
+        raise FitError("\n".join(msgs))
+    return [min.values[sl] for sl in slices]
 
 
 def _make_cost_fixed_pdfs(x: FloatArray, pdfs: Sequence[Density]) -> Cost:
@@ -449,23 +457,6 @@ def _make_cost_fixed_pdfs(x: FloatArray, pdfs: Sequence[Density]) -> Cost:
         return fint - np.sum(safe_log(f))
 
     return cost
-
-
-def _fit_mixture_fixed_shape(
-    x: FloatArray, pdfs: Sequence[Density], yields: Optional[Sequence[float]]
-) -> List[float]:
-    cost = _make_cost_fixed_pdfs(x, pdfs)
-
-    if yields is None:
-        yields = _guess_starting_yields(len(x), len(pdfs))
-    bounds = [(0, np.inf) for _ in range(len(pdfs))]
-    r = minimize(cost, yields, bounds=bounds, method="powell", options={"ftol": 0})
-    if not r.success:
-        msgs = [f"fit failed: {r.message}"]
-        for i, (pdf, y) in enumerate(zip(pdfs, yields)):
-            msgs.append(f"pdf {i}: starting yield={y}")
-        raise FitError("\n\t".join(msgs))
-    return list(r.x)
 
 
 def _guess_starting_value(a: float, b: float) -> float:
@@ -486,18 +477,56 @@ def safe_log(x: FloatArray) -> FloatArray:
     return np.log(np.maximum(TINY_FLOAT, x))  # type:ignore
 
 
-def get_pdf_parameters(pdf: Density) -> List[str]:
-    sig = inspect.signature(pdf)
-    names = []
+def get_pdf_parameters(pdf: Density) -> Dict[str, Tuple[float, float]]:
+    """
+    Return a dict of parameter names and bounds from a parametric density.
+
+    Accepts are parametric density function and extracts the names of the parameters
+    (all arguments after the first) and parameter limits, if the parameters are
+    annotated. The density may not contain a variable number of position-only or
+    keyword-only arguments. A ValueError is raised if such a density is passed.
+
+    Annotations of the following kind are accepted:
+    - annotated-types: Gt, Ge, Lt, Le, Interval
+    - Tuple(float, float): Lower and upper bound on the parameter. Can be infinity.
+    """
+    sig = inspect.signature(pdf, eval_str=True)
+    parameters = {}
+    first = True
     for name, par in sig.parameters.items():
+        # drop first argument, which is observations
+        if first:
+            first = False
+            continue
         if par.kind in (
             inspect.Parameter.VAR_POSITIONAL,
             inspect.Parameter.VAR_KEYWORD,
         ):
             raise ValueError("pdf contains variable number of arguments")
-        names.append(name)
-    # drop first argument, which is observations
-    return names[1:]
+        bound = (-np.inf, np.inf)
+        if par.annotation is not None:
+            metadata = getattr(par.annotation, "__metadata__", None)
+            if metadata is not None:
+                lower = -np.inf
+                upper = np.inf
+                for item in metadata:
+                    if isinstance(item, Sequence):
+                        if len(item) == 2:
+                            lower, upper = item
+                            continue
+                    lower = _getattrs(item, ("gt", "ge"), lower)
+                    upper = _getattrs(item, ("lt", "le"), upper)
+                bound = lower, upper
+        parameters[name] = bound
+    return parameters
+
+
+def _getattrs(obj: Any, keys: Sequence[str], default: Any) -> Any:
+    for key in keys:
+        val = getattr(obj, key, None)
+        if val is not None:
+            return val
+    return default
 
 
 class GofWarning(UserWarning):

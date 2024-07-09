@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sweights"
 requires-python = ">=3.9"
-dependencies = ["numpy>=1.20.1", "scipy>=1.5.1"]
+dependencies = ["numpy>=1.20.1", "scipy>=1.5.1", "iminuit"]
 authors = [
     { name = "Matthew Kenzie", email = "matthew.kenzie@cern.ch" },
     { name = "Hans Dembinski", email = "hans.dembinski@gmail.com" },
@@ -24,7 +24,13 @@ classifiers = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-cov", "coverage[toml]", "iminuit >= 2", "matplotlib"]
+test = [
+    "pytest",
+    "pytest-cov",
+    "coverage[toml]",
+    "matplotlib",
+    "annotated-types",
+]
 doc = [
     "ipython",
     "nbsphinx",
