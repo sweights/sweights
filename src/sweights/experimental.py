@@ -7,9 +7,8 @@ from .typing import Density, FloatArray, Range
 from .util import (
     pdf_from_histogram,
     fit_mixture,
-    FitError,
-    get_pdf_parameters,
     _quad_workaround,
+    _get_pdf_parameters,
     gof_pvalue,
     GofWarning,
 )
@@ -111,15 +110,7 @@ class Cows:
         bpdfs = list(bpdf) if isinstance(bpdf, Sequence) else [bpdf]
         self.pdfs = spdfs + bpdfs
 
-        parameters = [get_pdf_parameters(pdf) for pdf in self.pdfs]
         nfit = -1
-        if any(parameters):
-            if sample is None:
-                raise ValueError("sample cannot be None with parametric pdfs")
-            yields, self.pdfs = _fit_mixture_of_parametric_pdfs(
-                sample, self.pdfs, yields, parameters, bounds, starts
-            )
-            nfit = sum((len(p) for p in parameters), len(yields))
         if isinstance(norm, Sequence):
             xedges, self.norm = _process_histogram_argument(norm, range)
         elif isinstance(norm, Density):
@@ -134,21 +125,21 @@ class Cows:
             self.norm = norm
             nfit = 0
         elif norm is None:
+            if sample is None and yields is None:
+                raise ValueError(
+                    "norm cannot be None if sample is None and yields is None"
+                )
             xedges = np.array(range)
-            if yields is None:
+            has_parameters = any(_get_pdf_parameters(pdf) for pdf in self.pdfs)
+            if yields is None or has_parameters:
                 if sample is None:
-                    raise ValueError(
-                        "norm cannot be None if sample is None and yields is None"
+                    msg = (
+                        "sample cannot be None if norm is None and pdfs have parameters"
                     )
-                try:
-                    yields, _ = fit_mixture(sample, self.pdfs, yields)
-                except FitError as e:
-                    e.args = (
-                        f"{e.args[0]}; try to add bounds and good starting values "
-                        "or fit norm manually",
-                    )
-                    raise
-
+                    raise ValueError(msg)
+                yields, self.pdfs, nfit = _fit_mixture(
+                    sample, self.pdfs, yields, bounds, starts
+                )
             assert yields is not None
             yields_sum = sum(yields, 0.0)
 
@@ -159,7 +150,6 @@ class Cows:
                 return r
 
             self.norm = fn
-            nfit = len(yields)
         else:
             msg = f"var type {type(norm)} not recognized, see docs for valid types"
             raise ValueError(msg)
@@ -298,21 +288,20 @@ def _compute_w_element(
     return result
 
 
-def _fit_mixture_of_parametric_pdfs(
+def _fit_mixture(
     sample: FloatArray,
     pdfs: Sequence[Density],
     yields: Optional[Sequence[float]],
-    parameters: List[List[str]],
     bounds: Dict[Density, Dict[str, Range]],
     starts: Dict[Density, Dict[str, float]],
-) -> Tuple[List[float], List[Density]]:
+) -> Tuple[List[float], List[Density], int]:
     fitted_pdfs: List[Density] = []
-    yields, list_of_kwargs = fit_mixture(
-        sample, pdfs, yields, parameters, bounds, starts
-    )
+    yields, list_of_kwargs = fit_mixture(sample, pdfs, yields, bounds, starts)
+    nfit = len(yields)
     for pdf, kwargs in zip(pdfs, list_of_kwargs):
         if kwargs:
             fitted_pdfs.append(partial(pdf, **kwargs))
+            nfit += len(kwargs)
         else:
             fitted_pdfs.append(pdf)
-    return yields, fitted_pdfs
+    return yields, fitted_pdfs, nfit
