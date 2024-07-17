@@ -51,6 +51,7 @@ def import_optional_module(name: str, *, min_version: str = "") -> Any:
 
         if min_version:
             version = getattr(mod, "__version__", "0")
+            version = ''.join(filter(lambda x: x.isdigit() or x == '.', version))
 
             if not Version(min_version) <= Version(version):
                 msg = (
