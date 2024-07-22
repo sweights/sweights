@@ -76,7 +76,7 @@ def plot_indep_scatter(
             reduction_factor = len(x) // max_points
     ax.scatter(x[::reduction_factor], y[::reduction_factor], s=1)
     tau, err, pval = kendall_tau(x, y)
-    ax.set_title(f"$\\tau = {tau:.3f} \\pm {err:.3f}$, p-value $= {pval:.2f}$")
+    ax.set_title(f"$\\tau = {tau:.3f} \\pm {err:.3f}$, p-value = {pval:.2g}")
     fig.tight_layout()
     if save:
         fig.savefig(save)
