@@ -2,11 +2,13 @@
 
 from scipy.stats import kendalltau
 from .util import import_optional_module
+from .typing import FloatArray
+from typing import Tuple, Any, Optional
 
 __all__ = ["kendall_tau", "plot_indep_scatter"]
 
 
-def kendall_tau(x, y):
+def kendall_tau(x: FloatArray, y: FloatArray) -> Tuple[float, float, float]:
     """
     Return kendall tau correlation coefficient.
 
@@ -50,7 +52,13 @@ def kendall_tau(x, y):
     return (result.correlation, approx_var**0.5, result.pvalue)
 
 
-def plot_indep_scatter(x, y, reduction_factor=None, save=None, show=False):
+def plot_indep_scatter(
+    x: FloatArray,
+    y: FloatArray,
+    reduction_factor: int = 0,
+    save: Optional[str] = None,
+    show: bool = False,
+) -> Tuple[Any, Any]:
     """
     Plot scatter of two variables.
 
@@ -60,7 +68,7 @@ def plot_indep_scatter(x, y, reduction_factor=None, save=None, show=False):
     plt = import_optional_module("matplotlib.pyplot")
 
     fig, ax = plt.subplots()
-    if reduction_factor is None:
+    if reduction_factor == 0:
         max_points = 5000
         if len(x) < max_points:
             reduction_factor = 1
