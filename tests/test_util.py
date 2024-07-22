@@ -6,6 +6,23 @@ from scipy.integrate import quad
 from scipy.stats import norm, expon
 from typing import Annotated
 from iminuit.typing import Interval
+import sys
+from pathlib import Path
+
+
+def test_import_optional_module():
+    sys.path.append(Path(__file__).parent)
+    m = util.import_optional_module("dummy_module", min_version="6")
+    assert m.__version__ == "6.30/04"
+    with pytest.raises(ImportError):
+        util.import_optional_module("dummy_module", min_version="6.31")
+    with pytest.raises(ImportError):
+        util.import_optional_module("dummy_module", min_version="7")
+    with pytest.raises(
+        ImportError,
+        match=r"dummy_module found, but does not match minimum version 6\.30\.05",
+    ):
+        util.import_optional_module("dummy_module", min_version="6.30/05")
 
 
 @pytest.mark.parametrize(
