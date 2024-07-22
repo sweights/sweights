@@ -51,12 +51,11 @@ def import_optional_module(name: str, *, min_version: str = "") -> Any:
 
         if min_version:
             version = getattr(mod, "__version__", "0")
+            version = _normalize_version(version)
+            min_version = _normalize_version(min_version)
 
             if not Version(min_version) <= Version(version):
-                msg = (
-                    f"{name} found, but does not match the "
-                    f"required minimum version{min_version}"
-                )
+                msg = f"{name} found, but does not match minimum version {min_version}"
                 raise ImportError(msg)
 
         return mod
@@ -67,6 +66,11 @@ def import_optional_module(name: str, *, min_version: str = "") -> Any:
             "please install it manually to use this function."
         )
         raise
+
+
+def _normalize_version(version: str) -> str:
+    """Replace / with . in non-standard ROOT version string."""
+    return version.replace("/", ".")
 
 
 def convert_rf_pdf(

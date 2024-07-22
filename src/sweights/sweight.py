@@ -476,7 +476,7 @@ class SWeight:
     def _run_tsplot(self):
         assert self.method == "tsplot"
 
-        R = import_optional_module("ROOT", min_version=6)
+        R = import_optional_module("ROOT", min_version="6")
 
         # this works very differently for nD fits
         # so will not implement it here
