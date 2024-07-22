@@ -64,7 +64,7 @@ allow_redefinition = true
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["sweights.covariance", "sweights.sweight", "sweights.independence"]
+module = ["sweights.covariance", "sweights.sweight"]
 ignore_errors = true
 
 [tool.pytest.ini_options]
