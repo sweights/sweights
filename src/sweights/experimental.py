@@ -120,6 +120,7 @@ class Cows:
                     "providing a sample and an external function with norm "
                     "disables summation, override this with summation=True",
                     CowsWarning,
+                    stacklevel=2,
                 )
             xedges = np.array(range)
             self.norm = norm
@@ -173,7 +174,7 @@ class Cows:
                     f"goodness-of-fit test produces small p-value ({pgof:.2g}), "
                     "check fit result"
                 )
-                warnings.warn(msg, GofWarning)
+                warnings.warn(msg, GofWarning, stacklevel=2)
 
         # we must pass sample here, not self._sample, because sample may be set to None
         w = _compute_lower_w_matrix(self.pdfs, self.norm, xedges, sample)
