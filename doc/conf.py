@@ -3,6 +3,7 @@
 import os
 from sweights import __version__
 
+project = "sweights"
 release = f"{__version__}"
 
 # http://read-the-docs.readthedocs.org/en/latest/theme.html#how-do-i-use-this-locally-and-on-read-the-docs
