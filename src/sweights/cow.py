@@ -118,7 +118,7 @@ class Cow:
         if verbose:
             print("Initialising COW:")
 
-        self.Wkl = _compute_W(self.gk, self.Im, xe)
+        self.Wkl = _compute_W(self.gk, self.Im, xe)  # type:ignore
         if verbose:
             print("    W-matrix:")
             print("\t" + str(self.Wkl).replace("\n", "\n\t "))

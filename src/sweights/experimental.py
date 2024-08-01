@@ -310,7 +310,7 @@ def _fit_mixture(
     nfit = len(yields)
     for pdf, kwargs in zip(pdfs, list_of_kwargs):
         if kwargs:
-            fitted_pdfs.append(partial(pdf, **kwargs))
+            fitted_pdfs.append(partial(pdf, **kwargs))  # type:ignore
             nfit += len(kwargs)
         else:
             fitted_pdfs.append(pdf)
