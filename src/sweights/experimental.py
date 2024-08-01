@@ -1,8 +1,9 @@
 """Implementation of the new v2 interface for COWs and sWeights classes."""
 
 from scipy.linalg import solve
+from scipy.stats import uniform
 import numpy as np
-from typing import Union, Tuple, Optional, Sequence, List, Dict
+from typing import Union, Tuple, Optional, Sequence, List, Dict, Callable
 from .typing import Density, FloatArray, Range
 from .util import (
     pdf_from_histogram,
@@ -23,10 +24,11 @@ class CowsWarning(UserWarning):
 class Cows:
     """Compute weights using COWs."""
 
+    __slots__ = ("pdfs", "norm", "yields", "_am", "_sig")
+
     pdfs: List[Density]
-    var: Density
+    norm: Density
     yields: Optional[Sequence[float]]
-    _sample: Optional[FloatArray]
     _am: FloatArray
     _sig: int
 
@@ -100,19 +102,29 @@ class Cows:
             skip the test.
 
         """
-        self._sample = sample
-
-        if sample is not None and range is None:
-            range = (np.min(sample), np.max(sample))  # type:ignore
-
         spdfs = list(spdf) if isinstance(spdf, Sequence) else [spdf]
         self._sig = len(spdfs)
         bpdfs = list(bpdf) if isinstance(bpdf, Sequence) else [bpdf]
         self.pdfs = spdfs + bpdfs
 
-        nfit = -1
         if isinstance(norm, Sequence):
             xedges, self.norm = _process_histogram_argument(norm, range)
+            range = xedges[0], xedges[-1]
+        elif range is None:
+            if sample is None:
+                raise ValueError(
+                    "range must be set if sample is None and norm is not a histogram"
+                )
+            range = (np.min(sample), np.max(sample))  # type:ignore
+            xedges = np.array(range)
+        else:
+            xedges = np.array(range)
+        assert range is not None
+
+        nfit = -1
+        if isinstance(norm, Sequence):
+            # already handled above
+            assert self.norm is not None
         elif isinstance(norm, Density):
             if sample is not None and summation is None:
                 sample = None
@@ -122,43 +134,40 @@ class Cows:
                     CowsWarning,
                     stacklevel=2,
                 )
-            xedges = np.array(range)
             self.norm = norm
             nfit = 0
         elif norm is None:
             if sample is None and yields is None:
-                raise ValueError(
-                    "norm cannot be None if sample is None and yields is None"
-                )
-            xedges = np.array(range)
-            has_parameters = any(_get_pdf_parameters(pdf) for pdf in self.pdfs)
-            if yields is None or has_parameters:
-                if sample is None:
-                    msg = (
-                        "sample cannot be None if norm is None and pdfs have parameters"
+                has_parameters = any(_get_pdf_parameters(pdf) for pdf in self.pdfs)
+                if has_parameters:
+                    raise ValueError(
+                        "sample cannot be None if norm is None and "
+                        "yields is None if pdfs have parameters"
                     )
-                    raise ValueError(msg)
-                yields, self.pdfs, nfit = _fit_mixture(
-                    sample, self.pdfs, yields, bounds, starts
-                )
-            assert yields is not None
-            yields_sum = sum(yields, 0.0)
+                # no information about sample or yields or norm and all pdfs fixed,
+                # fall back to uniform norm, the only remaining possibility
+                self.norm = uniform(range[0], range[1] - range[0]).pdf
+            else:
+                if sample is not None:
+                    # this overrides yields if they are set
+                    yields, self.pdfs, nfit = _fit_mixture(
+                        sample, self.pdfs, yields, bounds, starts
+                    )
+                assert yields is not None
+                yields_sum = sum(yields, 0.0)
 
-            def fn(x: FloatArray) -> FloatArray:
-                r = np.zeros_like(x)
-                for a, pdf in zip(yields, self.pdfs):
-                    r += (a / yields_sum) * pdf(x)
-                return r
+                def fn(x: FloatArray) -> FloatArray:
+                    r = np.zeros_like(x)
+                    for a, pdf in zip(yields, self.pdfs):
+                        r += (a / yields_sum) * pdf(x)
+                    return r
 
-            self.norm = fn
+                self.norm = fn
         else:
             msg = f"var type {type(norm)} not recognized, see docs for valid types"
             raise ValueError(msg)
 
-        if xedges is None:
-            raise ValueError(
-                "if sample is None and norm is not a histogram, range must be set"
-            )
+        assert self.norm is not None
 
         if summation is False:
             sample = None
@@ -176,7 +185,6 @@ class Cows:
                 )
                 warnings.warn(msg, GofWarning, stacklevel=2)
 
-        # we must pass sample here, not self._sample, because sample may be set to None
         w = _compute_lower_w_matrix(self.pdfs, self.norm, xedges, sample)
 
         # invert W matrix to get A matrix using an algorithm
@@ -191,15 +199,12 @@ class Cows:
         )
         self.yields = yields
 
-    def component(self, idx: int, x: Optional[FloatArray] = None) -> FloatArray:
+    def __call__(self, x: FloatArray) -> FloatArray:
         """
-        Return weights for the indexed component.
+        Return weights for the signal component.
 
         Parameters
         ----------
-        idx: int
-            Index of the component. If this is -1, compute the weights for the sum of
-            signal components, if there are several.
         x: array of float or None, optional (default is None)
             Where in the domain of the discriminant variable to compute the weights. If
             the user already provided the sample of the discriminant variable during
@@ -207,14 +212,22 @@ class Cows:
             sample.
 
         """
-        if idx >= len(self.pdfs):
-            raise IndexError("idx is out of bounds")
+        return self._component(-1, x)
 
-        if x is None:
-            x = self._sample
-        if x is None:
-            raise ValueError("x cannot be None")
+    def __getitem__(self, idx: int) -> Callable[[FloatArray], FloatArray]:
+        """Return the weight function for the i-th component."""
+        if idx < 0:
+            idx += len(self)
+        if idx >= len(self):
+            raise IndexError
+        return lambda x: self._component(idx, x)
 
+    def __len__(self) -> int:
+        """Return number of components."""
+        return len(self.pdfs)
+
+    def _component(self, idx: int, x: FloatArray) -> FloatArray:
+        assert -1 <= idx < len(self)
         w = np.zeros_like(x)
         nx = self.norm(x)
         nx[nx == 0] = np.nan
@@ -224,10 +237,6 @@ class Cows:
             for k, ak in enumerate(self._am[i]):
                 w += ak * self.pdfs[k](x) / nx
         return w
-
-    def __call__(self, x: FloatArray, idx: int = -1) -> FloatArray:
-        """Return weights for argument, see component(...) for details."""
-        return self.component(idx, x)
 
 
 def _process_histogram_argument(
@@ -301,7 +310,7 @@ def _fit_mixture(
     nfit = len(yields)
     for pdf, kwargs in zip(pdfs, list_of_kwargs):
         if kwargs:
-            fitted_pdfs.append(partial(pdf, **kwargs))
+            fitted_pdfs.append(partial(pdf, **kwargs))  # type:ignore
             nfit += len(kwargs)
         else:
             fitted_pdfs.append(pdf)
