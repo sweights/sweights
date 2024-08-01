@@ -78,7 +78,7 @@ def test_Cows(norm_kind, sample_or_range_kind):
         cows = Cows(sample, gs, gb, norm, yields=yields, range=range)
 
     w = cows(m)
-    assert_equal(w, cows(m, 0))
+    assert_equal(w, cows[0](m))
 
     def wnll(par):
         d = stats.expon(0, *par)
