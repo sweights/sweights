@@ -34,7 +34,7 @@ test = [
 doc = [
     "ipython",
     "nbsphinx",
-    "sphinx_rtd_theme",
+    "sphinx_rtd_theme",  # installs the right version of sphinx
     "boost-histogram",
     "matplotlib==3.9.0", # 3.9.1 is broken on windows
     "uproot",

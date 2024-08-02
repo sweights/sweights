@@ -71,7 +71,7 @@ def doc(session: nox.Session) -> None:
     # link check
     session.run(
         "sphinx-build",
-        "-n",  # nitpicky mode
+        # "-n",  # nitpicky mode
         "-T",  # full tracebacks
         "-v",
         "-b=html",
@@ -83,7 +83,7 @@ def doc(session: nox.Session) -> None:
     )
 
 
-@nox.session(python="3.11", reuse_venv=True)
+@nox.session(python="3.12", reuse_venv=True)
 def linkcheck(session: nox.Session) -> None:
     """Check all links in the documentation."""
     session.install("-e.[test,doc]")

@@ -30,6 +30,7 @@ __all__ = [
     "pdf_from_histogram",
     "BernsteinBasisPdf",
     "make_bernstein_pdf",
+    "make_norm_pdf",
     "make_weighted_negative_log_likelihood",
 ]
 
@@ -326,6 +327,43 @@ def make_bernstein_pdf(degree: int, a: float, b: float) -> List[Density]:
         raise ValueError("minimum order is 1")
 
     return [BernsteinBasisPdf(i, degree, a, b) for i in range(degree + 1)]
+
+
+class truncnorm:
+    def __init__(self, a: float, b: float, mu: float, sigma: float):
+        d = norm(mu, sigma)
+        self.d = d
+        self.norm = d.cdf(b) - d.cdf(a)
+
+    def __call__(self, x: FloatArray) -> FloatArray:
+        return self.d.pdf(x) / self.norm  # type:ignore
+
+
+def make_norm_pdf(
+    a: float, b: float, mu: Sequence[float], sigma: float
+) -> List[Density]:
+    """
+    Construct a sequence of truncated normal distributions.
+
+    Parameters
+    ----------
+    a: float
+        Lower end of the data window.
+    b: float
+        Upper end of the data window.
+    mu: array-like
+        Locations of the truncated normal distributions.
+    sigma: float
+        Width of the truncated normal distributions.
+
+    Returns
+    -------
+    list of truncated normal distributions
+
+    """
+    mu, sigma = np.broadcast_arrays(mu, sigma)
+    mu, sigma = np.atleast_1d(mu, sigma)
+    return [truncnorm(a, b, mui, sigmai) for (mui, sigmai) in zip(mu, sigma)]
 
 
 def make_weighted_negative_log_likelihood(

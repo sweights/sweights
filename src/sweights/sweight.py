@@ -12,7 +12,7 @@ __all__ = ["convert_rf_pdf", "SWeight"]
 
 
 class SWeight:
-    """Produce sweights for a dataset given component pdfs."""
+    """Compute sweights for a dataset given component pdfs (old API)."""
 
     def __init__(
         self,

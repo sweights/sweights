@@ -12,7 +12,7 @@ __all__ = ["Cow"]
 
 
 class Cow:
-    """Produce weights using COWs."""
+    """Produce weights using COWs (old API)."""
 
     mrange: Range
     Im: Density
