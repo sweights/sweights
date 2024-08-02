@@ -9,6 +9,6 @@ Tutorials
     notebooks/basic
     notebooks/factorization_test
     notebooks/roopdf_conversion
-    notebooks/factorization_violation
-    notebooks/experimental
+    notebooks/experimental_nonfactorizing
+    notebooks/experimental_basic
     notebooks/experimental_nofit

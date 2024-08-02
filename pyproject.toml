@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sweights"
 requires-python = ">=3.9"
-dependencies = ["numpy>=1.20.1", "scipy>=1.5.1", "iminuit"]
+dependencies = ["numpy>=1.20.1", "scipy>=1.5.1", "iminuit>=2.20"]
 authors = [
     { name = "Matthew Kenzie", email = "matthew.kenzie@cern.ch" },
     { name = "Hans Dembinski", email = "hans.dembinski@gmail.com" },
@@ -24,13 +24,19 @@ classifiers = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-cov", "coverage[toml]", "matplotlib"]
+test = [
+    "pytest",
+    "pytest-xdist",
+    "pytest-cov",
+    "coverage[toml]",
+    "matplotlib==3.9.0", # 3.9.1 is broken on windows
+]
 doc = [
     "ipython",
     "nbsphinx",
-    "sphinx_rtd_theme",
+    "sphinx_rtd_theme",  # installs the right version of sphinx
     "boost-histogram",
-    "matplotlib",
+    "matplotlib==3.9.0", # 3.9.1 is broken on windows
     "uproot",
     "pandas",
 ]

@@ -21,11 +21,12 @@ jobs:
     # must come after checkout
     - uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: "3.12"
     - run: sudo apt-get install pandoc
     # - run: conda install -c conda-forge root
-    - run: pip install .[doc]
-    - run: make doc
+    - uses: yezz123/setup-uv@v4
+    - run: uv pip install --system nox
+    - run: nox -s doc
     - uses: actions/upload-pages-artifact@v3
       with:
         path: 'build/html'

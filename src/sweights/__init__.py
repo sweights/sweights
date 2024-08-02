@@ -1,6 +1,7 @@
 """Python interface to produce sweights and cows."""
 
 __all__ = [
+    "Cows",
     "SWeight",
     "Cow",
     "convert_rf_pdf",
@@ -12,6 +13,7 @@ __all__ = [
 ]
 
 from importlib.metadata import version
+from .experimental import Cows
 from .sweight import SWeight
 from .cow import Cow
 from .independence import kendall_tau, plot_indep_scatter

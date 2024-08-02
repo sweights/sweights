@@ -10,7 +10,7 @@ __all__ = ["kendall_tau", "plot_indep_scatter"]
 
 def kendall_tau(x: FloatArray, y: FloatArray) -> Tuple[float, float, float]:
     """
-    Return kendall tau correlation coefficient.
+    Run Kendall's tau test of independence.
 
     Useful for ascertainting the extent to which two variables are independent and thus
     the PDF for both variables factorizes into two independent PDFs, one for each
@@ -25,9 +25,9 @@ def kendall_tau(x: FloatArray, y: FloatArray) -> Tuple[float, float, float]:
 
     Parameters
     ----------
-    x : ndarray
+    x : array
         Values in the first dimension - must have the same shape as `y`
-    y : ndarray
+    y : array
         Values in the second dimension - must have the same shape as `x`
 
     Returns

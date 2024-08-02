@@ -27,13 +27,13 @@ def approx_cov_correct(pdf, data, wts, fvals, fcov, verbose=False):
         The control variable pdf which must take arguments (x, p0,...,pn)
         which has been fitted to a weighted dataset, where x is the observable
         and p0 ... pn are the shape parameters
-    data : ndarray
+    data : array
         The data values of the observable at which the pdf is evaluated
-    wts : ndarray
+    wts : array
         The values of the weights
     fvals : array_like
         A list of the fitted values of the shape parameters p0,....,pn
-    fcov : ndarray
+    fcov : array
         A covariance matrix of the weighted likelihood fit before the
         correction (this is normally available from the minmiser e.g. iminuit)
     verbose : bool, optional
@@ -41,7 +41,7 @@ def approx_cov_correct(pdf, data, wts, fvals, fcov, verbose=False):
 
     Returns
     -------
-    ndarray :
+    array :
         The corrected covariance matrix
 
     Notes
@@ -101,19 +101,19 @@ def cov_correct(
         A list of the disciminant variable pdfs which must take a single
         argument (x), where x is the observable (shape parameters of gxs must
         be known in this case)
-    hdata : ndarray
+    hdata : array
         The data values of the control variable observable at which the `hs`
         pdf is evaluated
-    gdata : ndarray
+    gdata : array
         The data values of the disciminant variable observable at which the
         `gxs` pdfs are evaluated
-    weights : ndarray
+    weights : array
         The values of the weights
     Nxs : list of float or tuple of float
         A list of the fitted yield values for the components gxs
     fvals : array_like
         A list of the fitted values of the shape parameters p0,....,pn
-    fcov : ndarray
+    fcov : array
         A covariance matrix of the weighted likelihood fit before the
         correction (this is normally available from the minmiser e.g. iminuit)
     dw_dW_fs : list of callable
@@ -127,7 +127,7 @@ def cov_correct(
 
     Returns
     -------
-    ndarray :
+    array :
         The corrected covariance matrix
 
     Notes

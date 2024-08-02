@@ -1,4 +1,4 @@
-"""Implementation of the new v2 interface for COWs and sWeights classes."""
+"""Implementation of the new v2 interface for COWs classes."""
 
 from scipy.linalg import solve
 from scipy.stats import uniform
@@ -22,7 +22,27 @@ class CowsWarning(UserWarning):
 
 
 class Cows:
-    """Compute weights using COWs."""
+    """
+    Compute sWeights using COWs (new experimental API).
+
+    This class replaces the old :class:`SWeight` and :class:`Cow` classes.
+    It can compute classic sWeights and the generalized COWs. It automatically
+    follows best practice based on the input that you give. When you use it
+    wrong, it will complain.
+
+    After initialization, the class instance is the weight function for the signal. To
+    compute sWeights, you need to pass the sample in the discriminant variable. This
+    sample must not be cut in any way, and the sWeights cannot be multiplied with other
+    weights, unless these weights are independent of both the discriminant and the
+    control variables.
+
+    You can also get weight functions for each component, with the ``__getitem__``
+    operator. You can iterate over the class instance to iterate over all weight
+    functions. To get the number of weight functions, use ``len()`` on the instance.
+
+    Furthermore, the class has some useful attributes, ``pdfs``, ``norm``, and
+    ``yields``.
+    """
 
     __slots__ = ("pdfs", "norm", "yields", "_am", "_sig")
 
@@ -103,9 +123,9 @@ class Cows:
 
         """
         spdfs = list(spdf) if isinstance(spdf, Sequence) else [spdf]
-        self._sig = len(spdfs)
         bpdfs = list(bpdf) if isinstance(bpdf, Sequence) else [bpdf]
         self.pdfs = spdfs + bpdfs
+        self._sig = len(spdfs)
 
         if isinstance(norm, Sequence):
             xedges, self.norm = _process_histogram_argument(norm, range)
@@ -179,11 +199,7 @@ class Cows:
             assert len(xedges) == 2  # required by numerical integration in gof_pvalue
             pgof = gof_pvalue(sample, self.norm, nfit)
             if pgof < 0.01:
-                msg = (
-                    f"goodness-of-fit test produces small p-value ({pgof:.2g}), "
-                    "check fit result"
-                )
-                warnings.warn(msg, GofWarning, stacklevel=2)
+                warnings.warn(GofWarning(pgof), stacklevel=2)
 
         w = _compute_lower_w_matrix(self.pdfs, self.norm, xedges, sample)
 
@@ -201,7 +217,7 @@ class Cows:
 
     def __call__(self, x: FloatArray) -> FloatArray:
         """
-        Return weights for the signal component.
+        Compute weights for the signal component.
 
         Parameters
         ----------
@@ -214,8 +230,25 @@ class Cows:
         """
         return self._component(-1, x)
 
-    def __getitem__(self, idx: int) -> Callable[[FloatArray], FloatArray]:
-        """Return the weight function for the i-th component."""
+    def __getitem__(self, idx: Union[int, str]) -> Callable[[FloatArray], FloatArray]:
+        """
+        Return the weight function for the i-th component.
+
+        You can also get the weight function for the signal and background by passing
+        the strings 's' and 'b', respectively.
+        """
+        if isinstance(idx, str):
+            if idx == "s":
+                return lambda x: sum(  # type:ignore
+                    self._component(i, x) for i in range(self._sig)
+                )
+            elif idx == "b":
+                return lambda x: sum(  # type:ignore
+                    self._component(i, x) for i in range(self._sig, len(self))
+                )
+            else:
+                msg = f"idx={idx!r} is not valid, use 's' or 'b'"
+                raise ValueError(msg)
         if idx < 0:
             idx += len(self)
         if idx >= len(self):

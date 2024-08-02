@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from scipy.integrate import quad
 from scipy.special import comb
-from scipy.stats import chi2
+from scipy.stats import chi2, norm
 import warnings
 from typing import (
     Tuple,
@@ -19,7 +19,7 @@ from typing import (
     Dict,
 )
 from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range, Cost
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike
 from iminuit import Minuit
 from iminuit.util import describe
 
@@ -30,6 +30,7 @@ __all__ = [
     "pdf_from_histogram",
     "BernsteinBasisPdf",
     "make_bernstein_pdf",
+    "make_norm_pdf",
     "make_weighted_negative_log_likelihood",
 ]
 
@@ -328,6 +329,43 @@ def make_bernstein_pdf(degree: int, a: float, b: float) -> List[Density]:
     return [BernsteinBasisPdf(i, degree, a, b) for i in range(degree + 1)]
 
 
+class truncnorm:
+    def __init__(self, a: float, b: float, mu: float, sigma: float):
+        d = norm(mu, sigma)
+        self.d = d
+        self.norm = d.cdf(b) - d.cdf(a)
+
+    def __call__(self, x: FloatArray) -> FloatArray:
+        return self.d.pdf(x) / self.norm  # type:ignore
+
+
+def make_norm_pdf(
+    a: float, b: float, mu: Sequence[float], sigma: float
+) -> List[Density]:
+    """
+    Construct a sequence of truncated normal distributions.
+
+    Parameters
+    ----------
+    a: float
+        Lower end of the data window.
+    b: float
+        Upper end of the data window.
+    mu: array-like
+        Locations of the truncated normal distributions.
+    sigma: float
+        Width of the truncated normal distributions.
+
+    Returns
+    -------
+    list of truncated normal distributions
+
+    """
+    mu, sigma = np.broadcast_arrays(mu, sigma)
+    mu, sigma = np.atleast_1d(mu, sigma)
+    return [truncnorm(a, b, mui, sigmai) for (mui, sigmai) in zip(mu, sigma)]
+
+
 def make_weighted_negative_log_likelihood(
     x: FloatArray,
     weights: FloatArray,
@@ -432,8 +470,8 @@ def _fit_mixture(
         yield_starts = _guess_starting_yields(len(x), len(pdfs))
     yield_bounds = [(0, np.inf) for _ in range(len(pdfs))]
 
-    starts2: NDArray[np.float64] = np.concatenate([yield_starts] + starts)
-    bounds2: NDArray[np.float64] = np.concatenate(
+    starts2: FloatArray = np.concatenate([yield_starts] + starts)
+    bounds2: FloatArray = np.concatenate(
         [yield_bounds] + bounds, axis=0  # type:ignore
     )
     min = Minuit(cost, starts2)
@@ -480,6 +518,11 @@ def safe_log(x: FloatArray) -> FloatArray:
 
 class GofWarning(UserWarning):
     """Warning emitted if the goodness-of-fit test fails or cannot be carried out."""
+
+    def __init__(self, pvalue: float):
+        sigma = norm().isf(pvalue)
+        msg = f"small p-value {pvalue:.2g} ({sigma:.1f}𝜎), " "check fit result"
+        super().__init__(msg)
 
 
 def gof_pvalue(x: FloatArray, pdf: Density, nfit: int) -> float:
