@@ -190,3 +190,19 @@ def test_fit_mixture_3():
         FitError, match=r"│ *4 *│ *x4 *│ *\-5e-1 *│*[^|]*│ *│ *│ *\-1 *│ *0 *│ *│"
     ):
         util.fit_mixture(x, (pdf1, pdf2), (1100, 1800), {pdf1: {"slope": (0.01, 2.0)}})
+
+
+def test_GofWarning():
+    assert util.GofWarning(0.5).args[0] == "small p-value 0.5 (0.0𝜎), check fit result"
+    assert (
+        util.GofWarning(norm.sf(1)).args[0]
+        == "small p-value 0.16 (1.0𝜎), check fit result"
+    )
+    assert (
+        util.GofWarning(norm.sf(3)).args[0]
+        == "small p-value 0.0013 (3.0𝜎), check fit result"
+    )
+    assert (
+        util.GofWarning(norm.sf(5)).args[0]
+        == "small p-value 2.9e-07 (5.0𝜎), check fit result"
+    )

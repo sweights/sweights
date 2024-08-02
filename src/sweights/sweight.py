@@ -36,7 +36,7 @@ class SWeight:
 
         Parameters
         ----------
-        data : ndarray
+        data : array
             The dataset in the discriminating variable, should have shape
             (nevents,ndiscvars) so for one discriminating variable will just
             be (N,) or (N,1).
@@ -64,7 +64,7 @@ class SWeight:
             A list of the component names. Only used for the legend entries
             when making a plot of the weight functions with
             :func:`make_weight_plot`
-        alphas: ndarray, optional
+        alphas: array, optional
             If using the 'subhess' method then the covariance matrix of a fit
             to the disciminanting variable(s) in which only the yields float
             must also be passed. This matrix is inverted to produce the
@@ -122,7 +122,7 @@ class SWeight:
         if not len(self.data.shape) == 2:
             raise ValueError(
                 """Input data is in the wrong format. Should be a numpy
-                ndarray with shape (nevs,ncomps)"""
+                array with shape (nevs,ncomps)"""
             )
         self.nevs = self.data.shape[0]
         self.ndiscvars = self.data.shape[1]
@@ -333,12 +333,12 @@ class SWeight:
 
         Parameters
         ----------
-        m : ndarray
+        m : array
             Values of the discriminating variable to compute weights for.
 
         Returns
         -------
-        ndarray :
+        array :
             Values of the weights
 
         """
@@ -355,13 +355,13 @@ class SWeight:
         ----------
         icomp : int, optional
             Get the weight function for the ith component
-        *args : ndarray
+        *args : array
             The values of the discriminating variables (one argument for each)
             as numpy arrays
 
         Returns
         -------
-        ndarray
+        array
             An array of the weights
 
         """
@@ -519,7 +519,7 @@ class SWeight:
         tsplot.MakeSPlot("Q")
 
         # get the weights out of TSPlot
-        weights = np.ndarray(len(self.data) * self.ncomps)
+        weights = np.array(len(self.data) * self.ncomps)
         tsplot.GetSWeights(weights)
         weights = np.reshape(weights, (-1, self.ncomps))
         data_w_weights = np.append(self.data, weights, axis=1)

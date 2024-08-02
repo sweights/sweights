@@ -135,7 +135,7 @@ class Cow:
 
         Parameters
         ----------
-        m : ndarray
+        m : array
             Values of the discriminating variable to compute weights for.
         idx : int, optional (default = -1)
             Index of the component to compute weights for. If equal to -1,
@@ -145,7 +145,7 @@ class Cow:
 
         Returns
         -------
-        ndarray :
+        array :
             Values of the weights
 
         """
@@ -161,12 +161,12 @@ class Cow:
         ----------
         k : int
             Index of the component.
-        m : ndarray
+        m : array
             Values of the discriminating variable to compute weights for.
 
         Returns
         -------
-        ndarray :
+        array :
             Values of the weights
 
         """

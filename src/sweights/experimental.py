@@ -179,11 +179,7 @@ class Cows:
             assert len(xedges) == 2  # required by numerical integration in gof_pvalue
             pgof = gof_pvalue(sample, self.norm, nfit)
             if pgof < 0.01:
-                msg = (
-                    f"goodness-of-fit test produces small p-value ({pgof:.2g}), "
-                    "check fit result"
-                )
-                warnings.warn(msg, GofWarning, stacklevel=2)
+                warnings.warn(GofWarning(pgof), stacklevel=2)
 
         w = _compute_lower_w_matrix(self.pdfs, self.norm, xedges, sample)
 

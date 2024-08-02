@@ -9,5 +9,7 @@ build/
 doc/.ipynb_checkpoints/
 venv
 .vscode
+.nox
 .*_cache
 outf.root
+.coverage

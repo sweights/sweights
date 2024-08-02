@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from scipy.integrate import quad
 from scipy.special import comb
-from scipy.stats import chi2
+from scipy.stats import chi2, norm
 import warnings
 from typing import (
     Tuple,
@@ -19,7 +19,7 @@ from typing import (
     Dict,
 )
 from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range, Cost
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike
 from iminuit import Minuit
 from iminuit.util import describe
 
@@ -432,8 +432,8 @@ def _fit_mixture(
         yield_starts = _guess_starting_yields(len(x), len(pdfs))
     yield_bounds = [(0, np.inf) for _ in range(len(pdfs))]
 
-    starts2: NDArray[np.float64] = np.concatenate([yield_starts] + starts)
-    bounds2: NDArray[np.float64] = np.concatenate(
+    starts2: FloatArray = np.concatenate([yield_starts] + starts)
+    bounds2: FloatArray = np.concatenate(
         [yield_bounds] + bounds, axis=0  # type:ignore
     )
     min = Minuit(cost, starts2)
@@ -480,6 +480,11 @@ def safe_log(x: FloatArray) -> FloatArray:
 
 class GofWarning(UserWarning):
     """Warning emitted if the goodness-of-fit test fails or cannot be carried out."""
+
+    def __init__(self, pvalue: float):
+        sigma = norm().isf(pvalue)
+        msg = f"small p-value {pvalue:.2g} ({sigma:.1f}𝜎), " "check fit result"
+        super().__init__(msg)
 
 
 def gof_pvalue(x: FloatArray, pdf: Density, nfit: int) -> float:

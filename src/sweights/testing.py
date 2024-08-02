@@ -2,7 +2,6 @@
 
 import numpy as np
 from typing import Tuple, Callable, Union, List
-from numpy.typing import NDArray
 from scipy.stats import norm, expon
 from .typing import FloatArray
 
@@ -21,7 +20,7 @@ def make_classic_toy(
     tb_mu: float = 0.1,
     tb_sigma: float = 0.1,
     random_sample_size: bool = True,
-) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+) -> Tuple[FloatArray, FloatArray, FloatArray]:
     """
     Generate a toy distribution to test the sweights and cows.
 
@@ -86,7 +85,7 @@ def make_classic_toy(
     dms = norm(ms_mu, ms_sigma)
     m_s = dms.ppf(rng.uniform(*dms.cdf(mrange), size=n_sig))  # type:ignore
 
-    m_b: Union[NDArray[np.float64], List[float]]
+    m_b: Union[FloatArray, List[float]]
     if isinstance(mb_mu, (int, float)):
         dmb = expon(0, mb_mu)
 

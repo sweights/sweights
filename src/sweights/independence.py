@@ -25,9 +25,9 @@ def kendall_tau(x: FloatArray, y: FloatArray) -> Tuple[float, float, float]:
 
     Parameters
     ----------
-    x : ndarray
+    x : array
         Values in the first dimension - must have the same shape as `y`
-    y : ndarray
+    y : array
         Values in the second dimension - must have the same shape as `x`
 
     Returns
