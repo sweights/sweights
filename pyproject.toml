@@ -11,7 +11,7 @@ authors = [
     { name = "Hans Dembinski", email = "hans.dembinski@gmail.com" },
 ]
 description = "Tools for producing sweights using classic methods or custom orthogonal weight functions (COWs) and for correcting covariance matrices for weighted data fits."
-readme = "README.md"
+readme = "README.rst"
 license = { text = "MIT" }
 classifiers = [
     "Development Status :: 4 - Beta",
