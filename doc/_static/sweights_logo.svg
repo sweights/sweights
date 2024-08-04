@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="109.5444mm"
+   height="22.885399mm"
+   viewBox="0 0 109.5444 22.885399"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.2.2 (b0a8486, 2022-12-01)"
+   sodipodi:docname="sweights_logo.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="true"
+     inkscape:zoom="0.84096521"
+     inkscape:cx="48.158948"
+     inkscape:cy="62.428267"
+     inkscape:window-width="1920"
+     inkscape:window-height="1027"
+     inkscape:window-x="0"
+     inkscape:window-y="25"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g1459"
+     showguides="true">
+    <inkscape:grid
+       type="xygrid"
+       id="grid546"
+       originx="-15.26664"
+       originy="-127.40991" />
+    <sodipodi:guide
+       position="4.4756796,17.368934"
+       orientation="0,-1"
+       id="guide1211"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="1.2508386,4.6268739"
+       orientation="0,-1"
+       id="guide1213"
+       inkscape:locked="false" />
+  </sodipodi:namedview>
+  <defs
+     id="defs2" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-15.26664,-127.40991)">
+    <g
+       id="g1459">
+      <path
+         style="color:#000000;fill:#e55933;fill-opacity:1;stroke:none;stroke-width:0;stroke-linejoin:round;stroke-dasharray:none"
+         d="m 21.253473,132.93423 c -0.380075,-1.5e-4 -0.688527,0.30743 -0.689453,0.6875 v 9.62305 c 4.93e-4,0.59776 0.7097,0.9115 1.152344,0.50977 l 10.621093,-9.6211 c 0.466024,-0.42349 0.166812,-1.19867 -0.46289,-1.19922 z"
+         id="path1267-8"
+         sodipodi:nodetypes="ccccccc" />
+      <path
+         style="color:#000000;fill:#2651ba;fill-opacity:1;stroke:none;stroke-linejoin:round;-inkscape-stroke:none"
+         d="m 26.858942,134.73306 c -0.249185,-0.11057 -0.540131,-0.0639 -0.742188,0.11914 l -10.623046,9.62305 c -0.466023,0.42349 -0.166812,1.19867 0.46289,1.19922 h 10.623047 c 0.380073,-9.3e-4 0.687651,-0.30938 0.6875,-0.68945 v -9.6211 c 6.16e-4,-0.27249 -0.159383,-0.51977 -0.408203,-0.63086 z"
+         id="path1273-9"
+         sodipodi:nodetypes="cccccccc" />
+      <path
+         id="path1267"
+         style="color:#000000;fill:#8a3a8a;fill-opacity:1;stroke:none;stroke-width:0;stroke-linejoin:round;stroke-dasharray:none"
+         d="m 26.566337,134.66723 c -0.163833,0.003 -0.32485,0.0639 -0.451135,0.17829 l -5.552633,5.03018 v 3.36259 c 4.93e-4,0.59775 0.709741,0.91125 1.152385,0.50952 l 5.550565,-5.02811 v -3.36207 c 6.16e-4,-0.27249 -0.159424,-0.51988 -0.408244,-0.63097 -0.09344,-0.0415 -0.192638,-0.0611 -0.290938,-0.0594 z" />
+    </g>
+    <text
+       xml:space="preserve"
+       style="font-size:25.4px;line-height:1.25;font-family:'NovaMono for Powerline';-inkscape-font-specification:'NovaMono for Powerline';word-spacing:0px;stroke-width:0.264583"
+       x="34.260223"
+       y="145.49471"
+       id="text236"><tspan
+         sodipodi:role="line"
+         id="tspan234"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:25.4px;font-family:'Nunito ExtraLight Medium';-inkscape-font-specification:'Nunito ExtraLight Medium, ';stroke-width:0.264583"
+         x="34.260223"
+         y="145.49471">weights</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:14.1111px;line-height:1.25;font-family:'NovaMono for Powerline';-inkscape-font-specification:'NovaMono for Powerline';word-spacing:0px;stroke-width:0.264583"
+       x="8.8987589"
+       y="162.84729"
+       id="text438"><tspan
+         sodipodi:role="line"
+         id="tspan436"
+         style="stroke-width:0.264583"
+         x="8.8987589"
+         y="162.84729" /></text>
+  </g>
+</svg>

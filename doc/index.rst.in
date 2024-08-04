@@ -1,0 +1,24 @@
+.. toctree::
+    :hidden:
+    :titlesonly:
+
+    install
+    reference
+    tutorials
+    contribute
+
+For a basic tour of what the package does have a look at the :ref:`tutorials` and at the  :ref:`reference`. Alternatively you can browse the :ref:`genindex`.
+
+If you are using RooFit_ to fit the component PDFs, you can still use this package after converting them, see converter_.
+
+The intention is to eventually include this package in Scikit-HEP_.
+
+Maintainers
+-----------
+
+* Matthew Kenzie (@matthewkenzie)
+* Hans Dembinski
+
+.. _converter: notebooks/roopdf_conversion.ipynb
+.. _RooFit: https://root.cern/manual/roofit
+.. _Scikit-HEP: https://scikit-hep.org

@@ -49,23 +49,25 @@ where = ["src"]
 
 [tool.setuptools_scm]
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
+[tool.ruff]
+src = ["src"]
 
 [tool.ruff.lint]
 extend-select = ["E", "F", "W", "D"]
-ignore = ["D212", "D203"]
+ignore = [
+    "D212", # multi-line-summary-first-line
+]
 unfixable = ["ERA"]
+pydocstyle.convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
-"test_*.py" = ["D", "E731"]
+"test_*.py" = ["B", "D", "E731"]
 "doc/**" = ["D", "E731"]
 
 [tool.mypy]
 plugins = "numpy.typing.mypy_plugin"
+files = ["src"]
 strict = true
-exclude = "test_.*\\.py$"
 allow_redefinition = true
 ignore_missing_imports = true
 
@@ -76,6 +78,5 @@ ignore_errors = true
 [tool.pytest.ini_options]
 addopts = "--doctest-modules --strict-config --strict-markers -q -ra --ff"
 testpaths = ["src/sweights", "tests"]
-log_cli_level = "INFO"
 xfail_strict = true
 filterwarnings = ["error::DeprecationWarning", "ignore::FutureWarning"]
