@@ -13,3 +13,4 @@ venv
 .*_cache
 outf.root
 .coverage
+doc/index.rst

@@ -3,6 +3,27 @@ from sweights import __version__ as release  # noqa
 import sphinx_rtd_theme
 
 project = "sweights"
+copyright = "2023, Matt Kenzie and Hans Dembinski"
+
+with open("../README.rst") as f:
+    readme_content = f.read()
+
+with open("index.rst.in") as f:
+    index_content = f.read()
+
+readme_content = readme_content.replace("doc/", "")
+readme_content = readme_content.replace(
+    ".. version-marker-do-not-remove",
+    "**These docs are for sweights version:** |release|",
+)
+
+begin = readme_content.index(".. index-replace-marker-begin-do-not-remove")
+end = readme_content.index(".. index-replace-marker-end-do-not-remove")
+readme_content = readme_content[:begin] + index_content + readme_content[end:]
+
+with open("index.rst", "w") as f:
+    f.write(readme_content)
+
 
 extensions = [
     "sphinx.ext.napoleon",
@@ -45,7 +66,8 @@ exclude_patterns = ["_build", "_themes", "Thumbs.db", ".DS_Store"]
 # If true, '()' will be appended to :func: etc. cross-reference text.
 add_function_parentheses = True
 
-html_static_path = []
+html_static_path = ["_static"]
+html_logo = "_static/sweights_logo.svg"
 
 html_theme = "sphinx_rtd_theme"
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
