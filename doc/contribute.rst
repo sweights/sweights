@@ -34,7 +34,7 @@ If you want to use this version elsewhere, you can go into the respective Python
 
     pip install <path-to-sweights>
 
-If you want to make a deeper dive into developing sweights, you may want to generate the documentation locally and run the coverage test. For that we use ``nox``, which sets up the environments automatically. To speed this up, we also use ``uv``.
+For a deeper dive into developing sweights, you may want to generate the documentation and run the coverage test. For that we use ``nox``, which sets up the environments automatically, and to speed this up, we use ``uv``.
 
 .. code-block:: bash
 

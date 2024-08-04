@@ -1,8 +1,6 @@
 .. toctree::
     :hidden:
-    :titlesonly:
 
-    install
     reference
     tutorials
     contribute
