@@ -128,7 +128,7 @@ class Cows:
 
         """
         if sample is not None:
-            sample = np.atleast_1d(sample)
+            sample = np.atleast_1d(sample).astype(float)
 
         spdfs = list(spdf) if isinstance(spdf, Sequence) else [spdf]
         bpdfs = list(bpdf) if isinstance(bpdf, Sequence) else [bpdf]
