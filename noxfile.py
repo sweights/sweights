@@ -28,8 +28,17 @@ nox.options.sessions = ["test", "maxtest"]
 def test(session: nox.Session) -> None:
     """Run all tests."""
     # running in parallel with pytest-xdist crashes ROOT
-    session.conda_install("root", channel="conda-forge")
-    session.install("-e.[test]")
+    session.conda_install(
+        "root",
+        "iminuit",
+        "scipy",
+        "pytest",
+        "pytest-cov",
+        "coverage",
+        "matplotlib",
+        channel="conda-forge",
+    )
+    session.install("-e.", "--no-deps")
     session.run("pytest")
 
 
@@ -54,10 +63,21 @@ def maxtest(session: nox.Session) -> None:
 
 
 # Python-3.12 provides coverage info faster
-@nox.session(python="3.12", venv_backend="uv", reuse_venv=True)
+# We need micromamba here to install ROOT
+@nox.session(python="3.12", venv_backend="micromamba", reuse_venv=True)
 def cov(session: nox.Session) -> None:
     """Run covage and place in 'htmlcov' directory."""
-    session.install("-e.[test]")
+    session.conda_install(
+        "root",
+        "iminuit",
+        "scipy",
+        "pytest",
+        "pytest-cov",
+        "coverage",
+        "matplotlib",
+        channel="conda-forge",
+    )
+    session.install("-e.", "--no-deps")
     session.run("coverage", "run", "-m", "pytest", env=ENV)
     session.run("coverage", "html", "-d", "build/htmlcov")
     session.run("coverage", "report", "-m")

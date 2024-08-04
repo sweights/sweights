@@ -3,6 +3,7 @@
 from scipy.linalg import solve
 from scipy.stats import uniform
 import numpy as np
+from numpy.typing import ArrayLike
 from typing import Union, Tuple, Optional, Sequence, List, Dict, Callable
 from .typing import Density, FloatArray, Range
 from .util import (
@@ -54,7 +55,7 @@ class Cows:
 
     def __init__(
         self,
-        sample: Optional[FloatArray],
+        sample: Optional[ArrayLike],
         spdf: Union[Density, Sequence[Density]],
         bpdf: Union[Density, Sequence[Density]],
         norm: Optional[Union[Density, Tuple[FloatArray, FloatArray]]] = None,
@@ -71,7 +72,7 @@ class Cows:
 
         Parameters
         ----------
-        sample: array or None
+        sample: array-like or None
             Sample over the discriminant variable. You should pass this to compute COWs
             via summation. If ``sample`` is None, COWs are computed with via
             integration. COWs may be computed via integration also if we cannot
@@ -121,7 +122,14 @@ class Cows:
             test fails. You can speed up the computation by setting this to False and
             skip the test.
 
+        Examples
+        --------
+        See :ref:`tutorials`.
+
         """
+        if sample is not None:
+            sample = np.atleast_1d(sample).astype(float)
+
         spdfs = list(spdf) if isinstance(spdf, Sequence) else [spdf]
         bpdfs = list(bpdf) if isinstance(bpdf, Sequence) else [bpdf]
         self.pdfs = spdfs + bpdfs
@@ -135,7 +143,7 @@ class Cows:
                 raise ValueError(
                     "range must be set if sample is None and norm is not a histogram"
                 )
-            range = (np.min(sample), np.max(sample))  # type:ignore
+            range = (np.min(sample), np.max(sample))
             xedges = np.array(range)
         else:
             xedges = np.array(range)
@@ -157,8 +165,8 @@ class Cows:
             self.norm = norm
             nfit = 0
         elif norm is None:
+            has_parameters = any(_get_pdf_parameters(pdf) for pdf in self.pdfs)
             if sample is None and yields is None:
-                has_parameters = any(_get_pdf_parameters(pdf) for pdf in self.pdfs)
                 if has_parameters:
                     raise ValueError(
                         "sample cannot be None if norm is None and "
@@ -168,7 +176,7 @@ class Cows:
                 # fall back to uniform norm, the only remaining possibility
                 self.norm = uniform(range[0], range[1] - range[0]).pdf
             else:
-                if sample is not None:
+                if sample is not None and (yields is None or has_parameters):
                     # this overrides yields if they are set
                     yields, self.pdfs, nfit = _fit_mixture(
                         sample, self.pdfs, yields, bounds, starts
@@ -184,7 +192,10 @@ class Cows:
 
                 self.norm = fn
         else:
-            msg = f"var type {type(norm)} not recognized, see docs for valid types"
+            msg = (
+                f"argument for norm ({type(norm)}) not recognized, "
+                "see docs for valid types"
+            )
             raise ValueError(msg)
 
         assert self.norm is not None
