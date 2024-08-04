@@ -11,7 +11,9 @@ with open("../README.rst") as f:
 with open("index.rst.in") as f:
     index_content = f.read()
 
-readme_content = readme_content.replace("doc/", "")
+readme_content = readme_content.replace(
+    "https://raw.githubusercontent.com/sweights/sweights/main/doc/", ""
+)
 readme_content = readme_content.replace(
     ".. version-marker-do-not-remove",
     "**These docs are for sweights version:** |release|",

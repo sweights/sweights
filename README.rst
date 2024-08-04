@@ -1,4 +1,4 @@
-.. |sweights| image:: _static/sweights_logo.svg
+.. |sweights| image:: https://raw.githubusercontent.com/sweights/sweights/main/doc/_static/sweights_logo.svg
    :alt: sweights
 
 |sweights|
