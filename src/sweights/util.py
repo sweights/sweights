@@ -516,6 +516,7 @@ def _fit_mixture(
     )
     nll = ExtendedUnbinnedNLL(x, model)
     min = Minuit(nll, *starts2, name=names)
+    min.strategy = 0
     min.limits = bounds2
     min.migrad()
     if validation is FitValidation.DISPLAY:
