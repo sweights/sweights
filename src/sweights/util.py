@@ -18,10 +18,12 @@ from typing import (
     Sequence,
     Dict,
 )
-from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range, Cost
+from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range
 from numpy.typing import ArrayLike
 from iminuit import Minuit
 from iminuit.util import describe
+from iminuit.cost import ExtendedUnbinnedNLL
+import enum
 
 __all__ = [
     "convert_rf_pdf",
@@ -390,6 +392,15 @@ def make_weighted_negative_log_likelihood(
     return nll
 
 
+class FitValidation(enum.Enum):
+    """How to validate the fit in :func:`fit_mixture`."""
+
+    NONE = 0
+    GOF = 1
+    DISPLAY = 2
+    PLOT = 3
+
+
 class FitError(RuntimeError):
     pass
 
@@ -400,6 +411,7 @@ def fit_mixture(
     yields: Optional[Sequence[float]] = None,
     bounds: Dict[Density, Dict[str, Range]] = {},
     starts: Dict[Density, Dict[str, float]] = {},
+    validation: FitValidation = FitValidation.GOF,
 ) -> Tuple[List[float], List[Dict[str, float]]]:
     pdfs = list(pdfs)
     if yields is not None:
@@ -407,8 +419,11 @@ def fit_mixture(
     parameters = [_get_pdf_parameters(pdf) for pdf in pdfs]
     pdf_bounds = []
     pdf_starts = []
+    par_names = []
     if any(parameters):
-        for pdf, pars in zip(pdfs, parameters):
+        for i, (pdf, pars) in enumerate(zip(pdfs, parameters)):
+            par_names.append(f"yield[{i}]")
+            par_names += list(pars)
             bounds_dict = bounds.get(pdf, {})
             starts_dict = starts.get(pdf, {})
             # bounds argument has precedence over bounds from annotations
@@ -419,7 +434,17 @@ def fit_mixture(
                 for k, (a, b) in zip(pars, bounds_list)
             ]
             pdf_starts.append(starts_list)
-    yields, *list_of_vals = _fit_mixture(x, pdfs, yields, pdf_bounds, pdf_starts)
+    else:
+        par_names = [f"yield[{i}]" for i in range(len(pdfs))]
+    yields, *list_of_vals = _fit_mixture(
+        x,
+        pdfs,
+        yields,
+        pdf_bounds,
+        pdf_starts,
+        par_names,
+        validation,
+    )
     if list_of_vals:
         list_of_kwargs = [
             {k: v for k, v in zip(pars, vals)}
@@ -430,21 +455,34 @@ def fit_mixture(
     return yields, list_of_kwargs
 
 
-def _make_cost_parametric_pdfs(
-    x: FloatArray, pdfs: Sequence[Density], slices: List[Any]
-) -> Cost:
+def _make_model_from_parametric_pdfs(
+    pdfs: Sequence[Density], slices: List[Any]
+) -> Callable[..., Tuple[float, FloatArray]]:
 
-    def cost(par: FloatArray) -> np.float64:
+    def model(x: FloatArray, *par: float) -> Tuple[float, FloatArray]:
         yields, *pars = (par[sl] for sl in slices)
         fint = 0.0
         f = np.zeros_like(x)
         for y, pdf, par in zip(yields, pdfs, pars):
             f += y * pdf(x, *par)
             fint += y
-        r = fint - np.sum(safe_log(f))
-        return r
+        return fint, f
 
-    return cost
+    return model
+
+
+def _make_model_from_fixed_pdfs(
+    pdfs: Sequence[Density],
+) -> Callable[..., Tuple[float, FloatArray]]:
+    def model(x: FloatArray, *par: float) -> Tuple[float, FloatArray]:
+        fint = 0.0
+        f = np.zeros_like(x)
+        for y, pdf in zip(par, pdfs):
+            f += y * pdf(x)
+            fint += y
+        return fint, f
+
+    return model
 
 
 def _fit_mixture(
@@ -453,6 +491,8 @@ def _fit_mixture(
     yield_starts: Optional[List[float]],
     bounds: List[List[Range]],
     starts: List[List[float]],
+    names: List[str],
+    validation: FitValidation,
 ) -> List[List[float]]:
     assert len(bounds) == len(starts)
     slices = [slice(0, len(pdfs))]
@@ -462,9 +502,9 @@ def _fit_mixture(
         ipar += len(s)
 
     if len(slices) > 1:
-        cost = _make_cost_parametric_pdfs(x, pdfs, slices)
+        model = _make_model_from_parametric_pdfs(pdfs, slices)
     else:
-        cost = _make_cost_fixed_pdfs(x, pdfs)
+        model = _make_model_from_fixed_pdfs(pdfs)
 
     if yield_starts is None:
         yield_starts = _guess_starting_yields(len(x), len(pdfs))
@@ -474,28 +514,32 @@ def _fit_mixture(
     bounds2: FloatArray = np.concatenate(
         [yield_bounds] + bounds, axis=0  # type:ignore
     )
-    min = Minuit(cost, starts2)
-    min.strategy = 0  # exact uncertainties are irrelevant
+    nll = ExtendedUnbinnedNLL(x, model)
+    min = Minuit(nll, *starts2, name=names)
     min.limits = bounds2
     min.migrad()
+    if validation is FitValidation.DISPLAY:
+        try:
+            from IPython.display import display
+
+            display(min)
+        except ModuleNotFoundError:
+            print(min)
+    elif validation is FitValidation.PLOT:
+        min.visualize()
+    elif validation is FitValidation.GOF:
+
+        def pdf(x: FloatArray) -> FloatArray:
+            fint, f = model(x, *min.values)
+            return f / fint
+
+        pgof = gof_pvalue(x, pdf, min.nfit)
+        if pgof < 0.01:
+            warnings.warn(GofWarning(pgof), stacklevel=2)
     if not min.valid:
         msgs = ["fit failed", f"{min.fmin}", f"{min.params}"]
         raise FitError("\n".join(msgs))
     return [min.values[sl] for sl in slices]
-
-
-def _make_cost_fixed_pdfs(x: FloatArray, pdfs: Sequence[Density]) -> Cost:
-    pdfsx = [pdf(x) for pdf in pdfs]
-
-    def cost(yields: FloatArray) -> np.float64:
-        fint = 0.0
-        f = np.zeros_like(x)
-        for y, pdfx in zip(yields, pdfsx):
-            f += y * pdfx
-            fint += y
-        return fint - np.sum(safe_log(f))
-
-    return cost
 
 
 def _guess_starting_value(a: float, b: float) -> float:
@@ -525,14 +569,33 @@ class GofWarning(UserWarning):
         super().__init__(msg)
 
 
-def gof_pvalue(x: FloatArray, pdf: Density, nfit: int) -> float:
+def gof_pvalue(
+    x: FloatArray, pdf: Density, nfit: int, *, bins: Union[int, ArrayLike] = 0
+) -> float:
     ntot = len(x)
-    bins = min(100, ntot // 10)
+    if isinstance(bins, int):
+        if bins == 0:
+            bins = min(100, ntot // 10)
+        edges = np.quantile(x, np.linspace(0, 1, bins + 1))
+    else:
+        xmin = x.min()
+        xmax = x.max()
+        bins = np.atleast_1d(bins)
+        if len(bins) < 2:
+            raise ValueError("bins array must at least have two entries")
+        if bins[0] > xmin or bins[-1] < xmax:
+            msg = (
+                f"edge range ({bins[0]}, {bins[-1]}) must not be "
+                f"narrower than data range ({xmin}, {xmax})"
+            )
+            raise ValueError(msg)
+        edges = np.array(bins).astype(np.float64)
+        bins = len(bins)
+
     if bins < 2:
         warnings.warn("not enough bins to perform test", GofWarning)
         return np.nan
 
-    edges = np.quantile(x, np.linspace(0, 1, bins + 1))
     counts = np.histogram(x, bins=edges)[0]
 
     # Compute integral over pdf with Simpson's rule to exploit

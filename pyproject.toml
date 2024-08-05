@@ -39,6 +39,7 @@ doc = [
     "matplotlib==3.9.0", # 3.9.1 is broken on windows
     "uproot",
     "pandas",
+    "resample",
 ]
 
 [project.urls]

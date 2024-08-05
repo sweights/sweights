@@ -186,9 +186,7 @@ def test_fit_mixture_3():
 
     from sweights.util import FitError
 
-    with pytest.raises(
-        FitError, match=r"│ *4 *│ *x4 *│ *\-5e-1 *│*[^|]*│ *│ *│ *\-1 *│ *0 *│ *│"
-    ):
+    with pytest.raises(FitError):
         util.fit_mixture(x, (pdf1, pdf2), (1100, 1800), {pdf1: {"slope": (0.01, 2.0)}})
 
 

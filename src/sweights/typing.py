@@ -1,13 +1,10 @@
 """Types used by the package."""
 
-from typing import Any, Protocol, Tuple, runtime_checkable, Callable
+from typing import Any, Protocol, Tuple, runtime_checkable
 from numpy.typing import NDArray
 import numpy as np
 
 FloatArray = NDArray[np.floating[Any]]
-
-
-Cost = Callable[..., np.float64]
 
 
 @runtime_checkable
