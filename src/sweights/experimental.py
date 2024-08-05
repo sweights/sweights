@@ -11,8 +11,7 @@ from .util import (
     fit_mixture,
     _quad_workaround,
     _get_pdf_parameters,
-    gof_pvalue,
-    GofWarning,
+    FitValidation,
 )
 import warnings
 from functools import partial
@@ -45,11 +44,12 @@ class Cows:
     ``yields``.
     """
 
-    __slots__ = ("pdfs", "norm", "yields", "_am", "_sig")
+    __slots__ = ("pdfs", "norm", "yields", "_wm", "_am", "_sig")
 
     pdfs: List[Density]
     norm: Density
     yields: Optional[Sequence[float]]
+    _wm: FloatArray
     _am: FloatArray
     _sig: int
 
@@ -65,7 +65,7 @@ class Cows:
         yields: Optional[Sequence[float]] = None,
         bounds: Dict[Density, Dict[str, Range]] = {},
         starts: Dict[Density, Dict[str, float]] = {},
-        validate_input: bool = True,
+        validation: FitValidation = FitValidation.GOF,
     ):
         """
         Initialize.
@@ -113,14 +113,17 @@ class Cows:
             Allows to pass parameter bounds to the fitter for each density.
         starts: Dict[Density, Dict[str, float]], optional (default is {})
             Allows to pass parameter starting values to the fitter for each density.
-        validate_input: bool, optional (default is True)
-            Whether to validate the input with a goodness-of-fit test. Applying COWs
-            requires that the component PDFs indeed describe the observed distribution.
-            Using the summation method further requires that the ``norm`` function is an
-            unbiased estimate of the observed distribution. The goodness-of-fit test is
-            able to detect violations of these requirements and emits a warning if the
-            test fails. You can speed up the computation by setting this to False and
-            skip the test.
+        validation: FitValidation, optional (default: FitValidation.GOF)
+            How to validate the internal fits, also see :class:`FitValidation`. For
+            getting optimal and unbiased weights, a linear combination of the component
+            PDFs need to match the observed distribution. Using the summation method
+            further requires that the ``norm`` function is an unbiased estimate of the
+            observed distribution. If set to DISPLAY, the full internal fit result is
+            shown (displayed in a Jupyter notebook or printed on the terminal). If set
+            to PLOT, only the fitted curve is plotted. If set to GOF, a goodness-of-fit
+            test is performed to detect bad fits and a warning is emitted if the test
+            fails. If you want nothing of that, you can slightly speed up the
+            computation by skipping all of that with NONE.
 
         Examples
         --------
@@ -149,7 +152,6 @@ class Cows:
             xedges = np.array(range)
         assert range is not None
 
-        nfit = -1
         if isinstance(norm, Sequence):
             # already handled above
             assert self.norm is not None
@@ -163,7 +165,6 @@ class Cows:
                     stacklevel=2,
                 )
             self.norm = norm
-            nfit = 0
         elif norm is None:
             has_parameters = any(_get_pdf_parameters(pdf) for pdf in self.pdfs)
             if sample is None and yields is None:
@@ -179,7 +180,7 @@ class Cows:
                 if sample is not None and (yields is None or has_parameters):
                     # this overrides yields if they are set
                     yields, self.pdfs, nfit = _fit_mixture(
-                        sample, self.pdfs, yields, bounds, starts
+                        sample, self.pdfs, yields, bounds, starts, validation
                     )
                 assert yields is not None
                 yields_sum = sum(yields, 0.0)
@@ -202,23 +203,13 @@ class Cows:
 
         if summation is False:
             sample = None
-
-        # If sample is not None here, summation technique is used to compute the W
-        # matrix, which requires that norm is an estimate of the total pdf. We test this
-        # with a GoF. No test is performed if norm derived from a histogram.
-        if validate_input and sample is not None and nfit >= 0:
-            assert len(xedges) == 2  # required by numerical integration in gof_pvalue
-            pgof = gof_pvalue(sample, self.norm, nfit)
-            if pgof < 0.01:
-                warnings.warn(GofWarning(pgof), stacklevel=2)
-
-        w = _compute_lower_w_matrix(self.pdfs, self.norm, xedges, sample)
+        self._wm = _compute_lower_w_matrix(self.pdfs, self.norm, xedges, sample)
 
         # invert W matrix to get A matrix using an algorithm
         # optimized for positive definite matrices
         self._am = solve(
-            w,
-            np.identity(len(w)),
+            self._wm,
+            np.identity(len(self)),
             lower=True,
             overwrite_a=True,
             overwrite_b=True,
@@ -348,9 +339,10 @@ def _fit_mixture(
     yields: Optional[Sequence[float]],
     bounds: Dict[Density, Dict[str, Range]],
     starts: Dict[Density, Dict[str, float]],
+    validate: FitValidation,
 ) -> Tuple[List[float], List[Density], int]:
     fitted_pdfs: List[Density] = []
-    yields, list_of_kwargs = fit_mixture(sample, pdfs, yields, bounds, starts)
+    yields, list_of_kwargs = fit_mixture(sample, pdfs, yields, bounds, starts, validate)
     nfit = len(yields)
     for pdf, kwargs in zip(pdfs, list_of_kwargs):
         if kwargs:
