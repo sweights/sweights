@@ -409,10 +409,9 @@ def fit_mixture(
     parameters = [_get_pdf_parameters(pdf) for pdf in pdfs]
     pdf_bounds = []
     pdf_starts = []
-    par_names = []
+    par_names = [f"yield[{i}]" for i in range(len(pdfs))]
     if any(parameters):
         for i, (pdf, pars) in enumerate(zip(pdfs, parameters)):
-            par_names.append(f"yield[{i}]")
             par_names += list(pars)
             bounds_dict = bounds.get(pdf, {})
             starts_dict = starts.get(pdf, {})
@@ -424,8 +423,6 @@ def fit_mixture(
                 for k, (a, b) in zip(pars, bounds_list)
             ]
             pdf_starts.append(starts_list)
-    else:
-        par_names = [f"yield[{i}]" for i in range(len(pdfs))]
     minuit, (yields, *list_of_vals) = _fit_mixture(
         x,
         pdfs,
