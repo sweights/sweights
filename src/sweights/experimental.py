@@ -6,15 +6,10 @@ import numpy as np
 from numpy.typing import ArrayLike
 from typing import Union, Tuple, Optional, Sequence, List, Dict, Callable
 from .typing import Density, FloatArray, Range
-from .util import (
-    pdf_from_histogram,
-    fit_mixture,
-    _quad_workaround,
-    _get_pdf_parameters,
-    FitValidation,
-)
+from .util import pdf_from_histogram, fit_mixture, _quad_workaround, _get_pdf_parameters
 import warnings
 from functools import partial
+from iminuit import Minuit
 
 
 class CowsWarning(UserWarning):
@@ -44,11 +39,23 @@ class Cows:
     ``yields``.
     """
 
-    __slots__ = ("pdfs", "norm", "yields", "_wm", "_am", "_sig")
+    __slots__ = (
+        "signal_pdfs",
+        "background_pdfs",
+        "norm",
+        "yields",
+        "minuit_discriminatory",
+        "minuit_control",
+        "_wm",
+        "_am",
+    )
 
-    pdfs: List[Density]
+    signal_pdfs: List[Density]
+    background_pdfs: List[Density]
     norm: Density
     yields: Optional[Sequence[float]]
+    minuit_discriminatory: Optional[Minuit]
+    minuit_control: Optional[Minuit]
     _wm: FloatArray
     _am: FloatArray
     _sig: int
@@ -65,7 +72,7 @@ class Cows:
         yields: Optional[Sequence[float]] = None,
         bounds: Dict[Density, Dict[str, Range]] = {},
         starts: Dict[Density, Dict[str, float]] = {},
-        validation: FitValidation = FitValidation.GOF,
+        validate: bool = True,
     ):
         """
         Initialize.
@@ -113,17 +120,15 @@ class Cows:
             Allows to pass parameter bounds to the fitter for each density.
         starts: Dict[Density, Dict[str, float]], optional (default is {})
             Allows to pass parameter starting values to the fitter for each density.
-        validation: FitValidation, optional (default: FitValidation.GOF)
-            How to validate the internal fits, also see :class:`FitValidation`. For
+        validate: bool, optional (default: True)
+            Whether to validate internal fits with goodness-of-fit test. For
             getting optimal and unbiased weights, a linear combination of the component
             PDFs need to match the observed distribution. Using the summation method
             further requires that the ``norm`` function is an unbiased estimate of the
-            observed distribution. If set to DISPLAY, the full internal fit result is
-            shown (displayed in a Jupyter notebook or printed on the terminal). If set
-            to PLOT, only the fitted curve is plotted. If set to GOF, a goodness-of-fit
+            observed distribution. If set to True, a goodness-of-fit
             test is performed to detect bad fits and a warning is emitted if the test
-            fails. If you want nothing of that, you can slightly speed up the
-            computation by skipping all of that with NONE.
+            fails. Otherwise, the test is skipped, which may slightly speed up the
+            computation.
 
         Examples
         --------
@@ -133,10 +138,9 @@ class Cows:
         if sample is not None:
             sample = np.atleast_1d(sample).astype(float)
 
-        spdfs = list(spdf) if isinstance(spdf, Sequence) else [spdf]
-        bpdfs = list(bpdf) if isinstance(bpdf, Sequence) else [bpdf]
-        self.pdfs = spdfs + bpdfs
-        self._sig = len(spdfs)
+        self.signal_pdfs = list(spdf) if isinstance(spdf, Sequence) else [spdf]
+        self.background_pdfs = list(bpdf) if isinstance(bpdf, Sequence) else [bpdf]
+        pdfs = self.signal_pdfs + self.background_pdfs
 
         if isinstance(norm, Sequence):
             xedges, self.norm = _process_histogram_argument(norm, range)
@@ -166,7 +170,7 @@ class Cows:
                 )
             self.norm = norm
         elif norm is None:
-            has_parameters = any(_get_pdf_parameters(pdf) for pdf in self.pdfs)
+            has_parameters = any(_get_pdf_parameters(pdf) for pdf in pdfs)
             if sample is None and yields is None:
                 if has_parameters:
                     raise ValueError(
@@ -179,15 +183,18 @@ class Cows:
             else:
                 if sample is not None and (yields is None or has_parameters):
                     # this overrides yields if they are set
-                    yields, self.pdfs, nfit = _fit_mixture(
-                        sample, self.pdfs, yields, bounds, starts, validation
+                    nsig = len(self.signal_pdfs)
+                    yields, pdfs, self.minuit_discriminatory = _fit_mixture(
+                        sample, pdfs, yields, bounds, starts, validate
                     )
+                    self.signal_pdfs = pdfs[:nsig]
+                    self.background_pdfs = pdfs[nsig:]
                 assert yields is not None
                 yields_sum = sum(yields, 0.0)
 
                 def fn(x: FloatArray) -> FloatArray:
                     r = np.zeros_like(x)
-                    for a, pdf in zip(yields, self.pdfs):
+                    for a, pdf in zip(yields, pdfs):
                         r += (a / yields_sum) * pdf(x)
                     return r
 
@@ -203,7 +210,7 @@ class Cows:
 
         if summation is False:
             sample = None
-        self._wm = _compute_lower_w_matrix(self.pdfs, self.norm, xedges, sample)
+        self._wm = _compute_lower_w_matrix(pdfs, self.norm, xedges, sample)
 
         # invert W matrix to get A matrix using an algorithm
         # optimized for positive definite matrices
@@ -230,7 +237,7 @@ class Cows:
             sample.
 
         """
-        return self._component(-1, x)
+        return self._component("s")(x)
 
     def __getitem__(self, idx: Union[int, str]) -> Callable[[FloatArray], FloatArray]:
         """
@@ -240,14 +247,8 @@ class Cows:
         the strings 's' and 'b', respectively.
         """
         if isinstance(idx, str):
-            if idx == "s":
-                return lambda x: sum(  # type:ignore
-                    self._component(i, x) for i in range(self._sig)
-                )
-            elif idx == "b":
-                return lambda x: sum(  # type:ignore
-                    self._component(i, x) for i in range(self._sig, len(self))
-                )
+            if idx in "sb":
+                return self._component(idx)
             else:
                 msg = f"idx={idx!r} is not valid, use 's' or 'b'"
                 raise ValueError(msg)
@@ -255,23 +256,34 @@ class Cows:
             idx += len(self)
         if idx >= len(self):
             raise IndexError
-        return lambda x: self._component(idx, x)
+        return self._component(idx)
 
     def __len__(self) -> int:
         """Return number of components."""
-        return len(self.pdfs)
+        return len(self.signal_pdfs) + len(self.background_pdfs)
 
-    def _component(self, idx: int, x: FloatArray) -> FloatArray:
-        assert -1 <= idx < len(self)
-        w = np.zeros_like(x)
-        nx = self.norm(x)
-        nx[nx == 0] = np.nan
-        irange = range(self._sig) if idx < 0 else range(idx, idx + 1)
-        for i in irange:
-            # we compute only one pdf[k](x) array at a time, because x may be large
-            for k, ak in enumerate(self._am[i]):
-                w += ak * self.pdfs[k](x) / nx
-        return w
+    def _component(self, idx: Union[int, str]) -> Callable[[FloatArray], FloatArray]:
+        # we compute only one pdf[k](x) array at a time, because x may be large
+        norm = self.norm
+        pdfs = self.signal_pdfs + self.background_pdfs
+        if isinstance(idx, int):
+            assert 0 <= idx < len(self)
+            am = self._am[idx]
+        elif idx == "s":
+            am = np.sum(self._am[: len(self.signal_pdfs)], axis=0)
+        else:
+            am = np.sum(self._am[len(self.signal_pdfs) :], axis=0)
+
+        def fn(x: FloatArray) -> FloatArray:
+            nx = norm(x)
+            nx[nx == 0] = np.nan
+            w = np.zeros_like(x)
+            for amk, pdf in zip(am, pdfs):
+                w += amk * pdf(x)
+            w /= nx
+            return w
+
+        return fn
 
 
 def _process_histogram_argument(
@@ -339,15 +351,15 @@ def _fit_mixture(
     yields: Optional[Sequence[float]],
     bounds: Dict[Density, Dict[str, Range]],
     starts: Dict[Density, Dict[str, float]],
-    validate: FitValidation,
-) -> Tuple[List[float], List[Density], int]:
+    validate: bool,
+) -> Tuple[List[float], List[Density], Minuit]:
     fitted_pdfs: List[Density] = []
-    yields, list_of_kwargs = fit_mixture(sample, pdfs, yields, bounds, starts, validate)
-    nfit = len(yields)
+    yields, list_of_kwargs, minuit = fit_mixture(
+        sample, pdfs, yields, bounds, starts, validate
+    )
     for pdf, kwargs in zip(pdfs, list_of_kwargs):
         if kwargs:
             fitted_pdfs.append(partial(pdf, **kwargs))  # type:ignore
-            nfit += len(kwargs)
         else:
             fitted_pdfs.append(pdf)
-    return yields, fitted_pdfs, nfit
+    return yields, fitted_pdfs, minuit

@@ -122,7 +122,7 @@ def test_fit_mixture_1():
     x1 = d1.rvs(100, random_state=rng)
     x2 = d2.rvs(200, random_state=rng)
     x = np.append(x1, x2)
-    yields, list_of_kwargs = util.fit_mixture(x, (d1.pdf, d2.pdf))
+    yields, list_of_kwargs, min = util.fit_mixture(x, (d1.pdf, d2.pdf))
     assert_allclose(yields, (100, 200), atol=5)
     assert list_of_kwargs == [{}, {}]
 
@@ -152,7 +152,7 @@ def test_fit_mixture_2():
     mi.migrad()
     assert mi.valid
 
-    yields, list_of_kwargs = util.fit_mixture(
+    yields, list_of_kwargs, min = util.fit_mixture(
         x,
         (pdf1, pdf2),
         (1100, 1800),

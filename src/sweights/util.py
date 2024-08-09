@@ -23,7 +23,6 @@ from numpy.typing import ArrayLike
 from iminuit import Minuit
 from iminuit.util import describe
 from iminuit.cost import ExtendedUnbinnedNLL
-import enum
 
 __all__ = [
     "convert_rf_pdf",
@@ -392,15 +391,6 @@ def make_weighted_negative_log_likelihood(
     return nll
 
 
-class FitValidation(enum.Enum):
-    """How to validate the fit in :func:`fit_mixture`."""
-
-    NONE = 0
-    GOF = 1
-    DISPLAY = 2
-    PLOT = 3
-
-
 class FitError(RuntimeError):
     pass
 
@@ -411,8 +401,8 @@ def fit_mixture(
     yields: Optional[Sequence[float]] = None,
     bounds: Dict[Density, Dict[str, Range]] = {},
     starts: Dict[Density, Dict[str, float]] = {},
-    validation: FitValidation = FitValidation.GOF,
-) -> Tuple[List[float], List[Dict[str, float]]]:
+    validate: bool = True,
+) -> Tuple[List[float], List[Dict[str, float]], Minuit]:
     pdfs = list(pdfs)
     if yields is not None:
         yields = list(yields)
@@ -436,14 +426,14 @@ def fit_mixture(
             pdf_starts.append(starts_list)
     else:
         par_names = [f"yield[{i}]" for i in range(len(pdfs))]
-    yields, *list_of_vals = _fit_mixture(
+    minuit, (yields, *list_of_vals) = _fit_mixture(
         x,
         pdfs,
         yields,
         pdf_bounds,
         pdf_starts,
         par_names,
-        validation,
+        validate,
     )
     if list_of_vals:
         list_of_kwargs = [
@@ -452,7 +442,7 @@ def fit_mixture(
         ]
     else:
         list_of_kwargs = [{}] * len(yields)
-    return yields, list_of_kwargs
+    return yields, list_of_kwargs, minuit
 
 
 def _make_model_from_parametric_pdfs(
@@ -492,8 +482,8 @@ def _fit_mixture(
     bounds: List[List[Range]],
     starts: List[List[float]],
     names: List[str],
-    validation: FitValidation,
-) -> List[List[float]]:
+    validate: bool,
+) -> Tuple[List[List[float]], Minuit]:
     assert len(bounds) == len(starts)
     slices = [slice(0, len(pdfs))]
     ipar = len(pdfs)
@@ -519,28 +509,19 @@ def _fit_mixture(
     min.strategy = 0
     min.limits = bounds2
     min.migrad()
-    if validation is FitValidation.DISPLAY:
-        try:
-            from IPython.display import display
 
-            display(min)
-        except ModuleNotFoundError:
-            print(min)
-    elif validation is FitValidation.PLOT:
-        min.visualize()
-    elif validation is FitValidation.GOF:
+    def pdf(x: FloatArray) -> FloatArray:
+        fint, f = model(x, *min.values)
+        return f / fint
 
-        def pdf(x: FloatArray) -> FloatArray:
-            fint, f = model(x, *min.values)
-            return f / fint
+    pgof = gof_pvalue(x, pdf, min.nfit)
+    if pgof < 0.01:
+        warnings.warn(GofWarning(pgof), stacklevel=2)
 
-        pgof = gof_pvalue(x, pdf, min.nfit)
-        if pgof < 0.01:
-            warnings.warn(GofWarning(pgof), stacklevel=2)
     if not min.valid:
         msgs = ["fit failed", f"{min.fmin}", f"{min.params}"]
         raise FitError("\n".join(msgs))
-    return [min.values[sl] for sl in slices]
+    return min, [min.values[sl] for sl in slices]
 
 
 def _guess_starting_value(a: float, b: float) -> float:
