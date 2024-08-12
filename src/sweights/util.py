@@ -511,9 +511,10 @@ def _fit_mixture(
         fint, f = model(x, *min.values)
         return f / fint
 
-    pgof = gof_pvalue(x, pdf, min.nfit)
-    if pgof < 0.01:
-        warnings.warn(GofWarning(pgof), stacklevel=2)
+    if validate:
+        pgof = gof_pvalue(x, pdf, min.nfit)
+        if pgof < 0.01:
+            warnings.warn(GofWarning(pgof), stacklevel=2)
 
     if not min.valid:
         msgs = ["fit failed", f"{min.fmin}", f"{min.params}"]
