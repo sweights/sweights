@@ -33,6 +33,7 @@ __all__ = [
     "make_bernstein_pdf",
     "make_norm_pdf",
     "make_weighted_negative_log_likelihood",
+    "point_derivative",
 ]
 
 
@@ -410,9 +411,10 @@ def fit_mixture(
     pdf_bounds = []
     pdf_starts = []
     par_names = [f"yield[{i}]" for i in range(len(pdfs))]
+    # we must protected against duplicated parameter names
     if any(parameters):
         for i, (pdf, pars) in enumerate(zip(pdfs, parameters)):
-            par_names += list(pars)
+            par_names += [f"pdf[{i}]:{p}" for p in pars]
             bounds_dict = bounds.get(pdf, {})
             starts_dict = starts.get(pdf, {})
             # bounds argument has precedence over bounds from annotations
@@ -627,3 +629,41 @@ def _get_pdf_parameters(fn: Density) -> Dict[str, Range]:
         )
         for (k, lim) in items
     }
+
+
+def point_derivative(
+    fn: Callable[..., FloatArray], x: FloatArray, par: FloatArray, step: FloatArray
+) -> List[FloatArray]:
+    """
+    Point-wise first derivative of the function with the central-difference formula.
+
+    Parameters
+    ----------
+    fn: callable
+        Function of the form fn(x, p1, ..., pN), where x is an array and p1 and pN are
+        parameters of the function. The function should return an array.
+    x: array
+        Where the function is evaluated.
+    par: array
+        Parameters of the function. We take the derivative with respect to these.
+    step: array
+        The step size for the central-difference formula.
+
+    Returns
+    -------
+    list of arrays
+        Each array contain the pointwise first partial derivatives of the function.
+        There is one array for each partial derivative.
+    """
+    deriv = []
+    for idx in range(len(par)):
+        # central difference
+        vp = par.copy()
+        vp[idx] += step[idx]
+        vm = par.copy()
+        vm[idx] -= step[idx]
+        fp = fn(x, *vp)
+        fm = fn(x, *vm)
+        h = vp[idx] - vm[idx]
+        deriv.append((fp - fm) / h)
+    return deriv

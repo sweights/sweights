@@ -4,12 +4,25 @@ from scipy.linalg import solve
 from scipy.stats import uniform
 import numpy as np
 from numpy.typing import ArrayLike
-from typing import Union, Tuple, Optional, Sequence, List, Dict, Callable
+from typing import Union, Tuple, Optional, Sequence, List, Dict, Callable, Any
 from .typing import Density, FloatArray, Range
-from .util import pdf_from_histogram, fit_mixture, _quad_workaround, _get_pdf_parameters
+from .util import (
+    pdf_from_histogram,
+    fit_mixture,
+    _quad_workaround,
+    _get_pdf_parameters,
+    _guess_starting_value,
+    import_optional_module,
+    make_weighted_negative_log_likelihood,
+    FitError,
+)
+from .covariance import covariance_weighted_ml_fit
+import re
+import copy
 import warnings
 from functools import partial
 from iminuit import Minuit
+from iminuit.util import _normalize_limit
 
 
 class CowsWarning(UserWarning):
@@ -48,6 +61,7 @@ class Cows:
         "minuit_control",
         "_wm",
         "_am",
+        "_init_kwargs",
     )
 
     signal_pdfs: List[Density]
@@ -58,11 +72,11 @@ class Cows:
     minuit_control: Optional[Minuit]
     _wm: FloatArray
     _am: FloatArray
-    _sig: int
+    _init_kwargs: Dict[str, Any]
 
     def __init__(
         self,
-        sample: Optional[ArrayLike],
+        x: Optional[ArrayLike],
         spdf: Union[Density, Sequence[Density]],
         bpdf: Union[Density, Sequence[Density]],
         norm: Optional[Union[Density, Tuple[FloatArray, FloatArray]]] = None,
@@ -79,7 +93,7 @@ class Cows:
 
         Parameters
         ----------
-        sample: array-like or None
+        x: array-like or None
             Sample over the discriminant variable. You should pass this to compute COWs
             via summation. If ``sample`` is None, COWs are computed with via
             integration. COWs may be computed via integration also if we cannot
@@ -135,22 +149,36 @@ class Cows:
         See :ref:`tutorials`.
 
         """
-        if sample is not None:
-            sample = np.atleast_1d(sample).astype(float)
+        spdf = list(spdf) if isinstance(spdf, Sequence) else [spdf]
+        bpdf = list(bpdf) if isinstance(bpdf, Sequence) else [bpdf]
 
-        self.signal_pdfs = list(spdf) if isinstance(spdf, Sequence) else [spdf]
-        self.background_pdfs = list(bpdf) if isinstance(bpdf, Sequence) else [bpdf]
+        self._init_kwargs = {
+            "spdf": spdf,
+            "bpdf": bpdf,
+            "norm": norm,
+            "range": range,
+            "summation": summation,
+            "yields": yields,
+            "bounds": bounds,
+            "starts": starts,
+        }
+
+        if x is not None:
+            x = np.atleast_1d(x).astype(float)
+
+        self.signal_pdfs = spdf
+        self.background_pdfs = bpdf
         pdfs = self.signal_pdfs + self.background_pdfs
 
         if isinstance(norm, Sequence):
             xedges, self.norm = _process_histogram_argument(norm, range)
             range = xedges[0], xedges[-1]
         elif range is None:
-            if sample is None:
+            if x is None:
                 raise ValueError(
-                    "range must be set if sample is None and norm is not a histogram"
+                    "range must be set if x is None and norm is not a histogram"
                 )
-            range = (np.min(sample), np.max(sample))
+            range = (np.min(x), np.max(x))
             xedges = np.array(range)
         else:
             xedges = np.array(range)
@@ -160,10 +188,10 @@ class Cows:
             # already handled above
             assert self.norm is not None
         elif isinstance(norm, Density):
-            if sample is not None and summation is None:
-                sample = None
+            if x is not None and summation is None:
+                x = None
                 warnings.warn(
-                    "providing a sample and an external function with norm "
+                    "providing a x and an external function with norm "
                     "disables summation, override this with summation=True",
                     CowsWarning,
                     stacklevel=2,
@@ -171,21 +199,21 @@ class Cows:
             self.norm = norm
         elif norm is None:
             has_parameters = any(_get_pdf_parameters(pdf) for pdf in pdfs)
-            if sample is None and yields is None:
+            if x is None and yields is None:
                 if has_parameters:
                     raise ValueError(
-                        "sample cannot be None if norm is None and "
+                        "x cannot be None if norm is None and "
                         "yields is None if pdfs have parameters"
                     )
-                # no information about sample or yields or norm and all pdfs fixed,
+                # no information about x or yields or norm and all pdfs fixed,
                 # fall back to uniform norm, the only remaining possibility
                 self.norm = uniform(range[0], range[1] - range[0]).pdf
             else:
-                if sample is not None and (yields is None or has_parameters):
+                if x is not None and (yields is None or has_parameters):
                     # this overrides yields if they are set
                     nsig = len(self.signal_pdfs)
                     yields, pdfs, self.minuit_discriminatory = _fit_mixture(
-                        sample, pdfs, yields, bounds, starts, validate
+                        x, pdfs, yields, bounds, starts, validate
                     )
                     self.signal_pdfs = pdfs[:nsig]
                     self.background_pdfs = pdfs[nsig:]
@@ -209,8 +237,8 @@ class Cows:
         assert self.norm is not None
 
         if summation is False:
-            sample = None
-        self._wm = _compute_lower_w_matrix(pdfs, self.norm, xedges, sample)
+            x = None
+        self._wm = _compute_lower_w_matrix(pdfs, self.norm, xedges, x)
 
         # invert W matrix to get A matrix using an algorithm
         # optimized for positive definite matrices
@@ -230,11 +258,8 @@ class Cows:
 
         Parameters
         ----------
-        x: array of float or None, optional (default is None)
-            Where in the domain of the discriminant variable to compute the weights. If
-            the user already provided the sample of the discriminant variable during
-            initialization, you can leave this to None and weights are computed for that
-            sample.
+        x: array of float
+            Where in the domain of the discriminant variable to compute the weights.
 
         """
         return self._component("s")(x)
@@ -284,6 +309,133 @@ class Cows:
             return w
 
         return fn
+
+    def fit(
+        self,
+        x: ArrayLike,
+        y: ArrayLike,
+        model: Callable[..., FloatArray],
+        *,
+        bounds: Dict[str, Range] = {},
+        starts: Dict[str, float] = {},
+        covariance_estimation: str = "bootstrap",
+        replicas: int = 100,
+    ) -> Tuple[FloatArray, FloatArray]:
+        """
+        Estimate model parameters in the  control sample.
+
+        Parameters
+        ----------
+        x : array-like
+            Sample over the discriminant variable. This must be the same that you used
+            to compute COWs, if the COWs were estimated from data. The ``x`` and ``y``
+            samples must form pairs.
+        y : array-like
+            Sample over the control variable, which correspond to the ``x`` sample. The
+            order of x and y values must be matched so that they form pairs.
+        model : callable
+            Model that is fitted to the weighted sample. It is a callable that accepts
+            the discriminatory variable as first argument, followed by the parameters
+            that should be estimated as individual floats. Depending on the kind of fit
+            (see ``method``), the model function should return the pdf, the cdf, or an
+            integral, density pair.
+        bounds: Dict[str, Range], optional (default is {})
+            Allows to pass parameter bounds to the fitter for each density.
+        starts: Dict[str, float], optional (default is {})
+            Allows to pass parameter starting values to the fitter for each density.
+        covariance_estimate: str, optional; default is "bootstrap"
+            How to estimate the covariance matrix of the fitted parameters. If set to
+            "bootstrap" (the default), full but slow error propagation is performed with
+            the bootstrap method. A second option is "fast", which computes an
+            approximation that neglects uncertainties in the COWs. This is often equal
+            to full error propagation and must faster to compute. For the fastest
+            results, use this together with a binned fit. We do not offer full
+            analytical error propagation, because it is very complex to implement and
+            also slow to compute. Use the bootstrap instead.
+        replicas : int, optional; default is 100
+            Number of bootstrap replicas that are computed. Only used if
+            ``covariance_estimate`` is "bootstrap".
+
+        Returns
+        -------
+        (values, covariance)
+            A tuple consisting of an array with the best fit values, and another array
+            that represents the covariance matrix.
+
+        Notes
+        -----
+        We do not support extended maximum-likelihood fits for fitting the weighted
+        sample in the control variable, because it makes no sense to fit a density. The
+        signal yield should be computed by summing the weights (optionally also in bins
+        of the control variable). An approximate uncertainty estimate per bin that
+        neglects uncertainties in the COWs is sqrt(sum(w**2)). Full error propagation
+        including bin-to-bin correlations can be achieved with the bootstrap.
+
+        The internal bootstrap is using a pseudo-random number generator, which is
+        seeded with the length of the input arrays, to make results from repeated calls
+        deterministic.
+        """
+        x, y = np.atleast_1d(x, y)
+
+        if len(x) != len(y):
+            raise ValueError("x and y must have same length")
+
+        bootstrap = covariance_estimation == "bootstrap"
+        w = self(x)
+        self.minuit_control = _fit_weighted(y, w, model, bounds, starts, bootstrap)
+        val = np.array(self.minuit_control.values[:])
+
+        if bootstrap:
+            covariance = import_optional_module("resample.bootstrap").covariance
+
+            kwargs = copy.deepcopy(self._init_kwargs)
+            dmin = self.minuit_discriminatory
+            if dmin is not None:
+                kwargs["yields"] = dmin.values[: len(self)]
+                s: Dict[Any, Dict[str, float]] = {}
+                pdfs = kwargs["spdf"] + kwargs["bpdf"]
+                for name in dmin.parameters:
+                    re_match = re.match(r"^pdf[(\d+)]:(.+)", name)
+                    if re_match:
+                        pdf = pdfs[int(re_match.group(1))]
+                        pname = re_match.group(2)
+                        pval = dmin.values[name]
+                        if pdf in s:
+                            s[pdf][pname] = pval
+                        else:
+                            s[pdf] = {pname: pval}
+                kwargs["starts"] = s
+
+            bounds = {}
+            starts = {}
+            min = self.minuit_control
+            for par in min.parameters:
+                bounds[par] = min.limits[par]
+                starts[par] = min.values[par]
+
+            def est(x: FloatArray, y: FloatArray) -> FloatArray:
+                # replica fits tend to have slightly bad gof
+                w = Cows(x, **kwargs, validate=False)(x)
+                m = _fit_weighted(y, w, model, bounds, starts, bootstrap)
+                return np.array(m.values[:])
+
+            cov = covariance(
+                est,
+                x,
+                y,
+                method="extended",
+                size=replicas,
+                random_state=len(x),
+            )
+            cov = np.atleast_2d(cov)
+        elif covariance_estimation == "fast":
+            m = self.minuit_control
+            cov = covariance_weighted_ml_fit(model, y, w, m.values[:], m.covariance)
+        else:
+            msg = f"unknown value covariance_estimation={covariance_estimation!r}"
+            raise ValueError(msg)
+
+        return val, cov
 
 
 def _process_histogram_argument(
@@ -363,3 +515,35 @@ def _fit_mixture(
         else:
             fitted_pdfs.append(pdf)
     return yields, fitted_pdfs, minuit
+
+
+def _fit_weighted(
+    y: FloatArray,
+    w: FloatArray,
+    model: Callable[..., FloatArray],
+    bounds: Dict[str, Range],
+    starts: Dict[str, float],
+    bootstrap: bool,
+) -> Minuit:
+    ## binned fit has problems, because sum of weights can be negative
+    # val = np.histogram(y, bins=yedges, weights=w)[0]
+    # var = np.histogram(y, bins=yedges, weights=w**2)[0]
+    # wnll = BinnedNLL(np.transpose((val, var)), yedges, model)
+
+    wnll = make_weighted_negative_log_likelihood(y, w, model)
+
+    for k in wnll._parameters:  # type:ignore
+        if k in bounds:
+            wnll._parameters[k] = _normalize_limit(bounds[k])  # type:ignore
+
+    for k, (a, b) in wnll._parameters.items():  # type:ignore
+        if k not in starts:
+            starts[k] = _guess_starting_value(a, b)
+
+    min = Minuit(wnll, **starts)
+    min.strategy = 0 if bootstrap else 1
+    min.migrad()
+    if not min.valid:
+        msgs = ["fit failed", f"{min.fmin}", f"{min.params}"]
+        raise FitError("\n".join(msgs))
+    return min

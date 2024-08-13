@@ -2,11 +2,11 @@ from sweights.testing import make_classic_toy
 from sweights.experimental import Cows, CowsWarning
 from sweights.util import make_bernstein_pdf, make_norm_pdf
 from scipy import stats
-from scipy.optimize import minimize
+from iminuit import Minuit
 import numpy as np
 from numpy.testing import assert_allclose, assert_equal
 import pytest
-from typing import Callable
+from typing import Callable, Annotated
 
 
 @pytest.mark.parametrize("norm_kind", ("fit", "yields", "g(m)", "hist"))
@@ -82,13 +82,15 @@ def test_Cows(norm_kind, sample_or_range_kind):
     assert_equal(w, cows[0](m))
 
     def wnll(par):
-        d = stats.expon(0, *par)
+        d = stats.expon(0, par)
         dnorm = np.diff(d.cdf(trange))
         return -2 * np.sum(w * (d.logpdf(t) - np.log(dnorm)))
 
-    r = minimize(wnll, [1.0], bounds=[(1e-3, None)])
-    assert r.success
-    assert_allclose(r.x, ts_mu, atol=1e-2)
+    m = Minuit(wnll, 1.0)
+    m.limits = (1e-3, None)
+    m.migrad()
+    assert m.valid
+    assert_allclose(m.values, ts_mu, rtol=1e-2)
 
 
 def test_special_index():
@@ -128,3 +130,64 @@ def test_special_index():
 
     for i, cow in enumerate(cows):
         assert_equal(cows[i](m), cow(m))
+
+
+def test_repeated_parameter_name():
+    m, t, sigmask = make_classic_toy(1)
+    mrange = (0, 1)
+
+    def gs(m, mu: Annotated[float, 0:1], sigma: Annotated[float, 0 : np.inf]):
+        d = stats.norm(mu, sigma)
+        dnorm = np.diff(d.cdf(mrange))
+        return d.pdf(m) / dnorm
+
+    def gb(m, mu: Annotated[float, 0 : np.inf]):
+        d = stats.expon(0, mu)
+        dnorm = np.diff(d.cdf(mrange))
+        return d.pdf(m) / dnorm
+
+    cows = Cows(m, gs, gb)
+    assert cows.minuit_discriminatory.valid
+    assert cows.minuit_discriminatory.parameters == (
+        "yield[0]",
+        "yield[1]",
+        "pdf[0]:mu",
+        "pdf[0]:sigma",
+        "pdf[1]:mu",
+    )
+
+
+def test_fit():
+    m, t, sigmask = make_classic_toy(1)
+    mrange = (0, 1)
+    trange = (0, 1.5)
+
+    def gs(m, mu: Annotated[float, 0:1], sigma: Annotated[float, 0 : np.inf]):
+        d = stats.norm(mu, sigma)
+        dnorm = np.diff(d.cdf(mrange))
+        return d.pdf(m) / dnorm
+
+    def gb(m, mu: Annotated[float, 0 : np.inf]):
+        d = stats.expon(0, mu)
+        dnorm = np.diff(d.cdf(mrange))
+        return d.pdf(m) / dnorm
+
+    cows = Cows(m, gs, gb)
+
+    def model(t, mu: Annotated[float, 0 : np.inf]):
+        d = stats.expon(0, mu)
+        dnorm = np.diff(d.cdf(trange))
+        return d.pdf(t) / dnorm
+
+    val_fast, cov_fast = cows.fit(m, t, model, covariance_estimation="fast")
+    val_boot, cov_boot = cows.fit(
+        m, t, model, covariance_estimation="bootstrap", replicas=10
+    )
+
+    assert len(val_fast) == 1
+    assert len(val_boot) == 1
+    assert_allclose(val_fast, 0.2, atol=1e-3)
+    assert_allclose(cov_fast**0.5, 0.003, rtol=0.2)
+    # val_fast and val_boot are not identical because strategy 0 vs. strategy 1
+    assert_allclose(val_boot, 0.2, atol=1e-3)
+    assert_allclose(cov_boot**0.5, 0.003, rtol=0.2)
