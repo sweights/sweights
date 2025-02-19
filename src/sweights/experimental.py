@@ -322,13 +322,13 @@ def _compute_w_element(
 
         result = np.float64(0)
         for x0, x1 in zip(xedges[:-1], xedges[1:]):
-            result += _quad_workaround(fn, x0, x1)
+            result += _quad_workaround(fn, float(x0), float(x1))
 
     else:
         g1x = g1(sample)
         g2x = g2(sample)
         varx = var(sample)
-        result = np.mean(g1x * g2x * varx**-2)
+        result = np.mean(g1x * g2x * varx**-2, dtype=np.float64)
 
     return result
 
