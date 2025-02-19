@@ -384,7 +384,7 @@ def make_weighted_negative_log_likelihood(
 
     def nll(*args: float) -> float:
         lp = safe_log(model(x, *args))
-        return -2 * np.sum(weights * lp)  # type:ignore
+        return -2 * np.sum(weights * lp)
 
     nll.errordef = 1.0  # type:ignore
     nll._parameters = parameters  # type:ignore

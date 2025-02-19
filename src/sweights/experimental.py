@@ -328,7 +328,7 @@ def _compute_w_element(
         g1x = g1(sample)
         g2x = g2(sample)
         varx = var(sample)
-        result = np.mean(g1x * g2x * varx**-2)
+        result = np.mean(g1x * g2x * varx**-2, dtype=np.float64)
 
     return result
 
