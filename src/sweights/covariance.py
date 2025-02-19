@@ -8,11 +8,9 @@ except ImportError:
     # fallback for scipy versions older than 1.12.0
     from scipy.misc import derivative
 
-# derivative of function pdf with respect to variable at index var
-# evaluated at point point
-
 
 def _partial_derivative(pdf, var, point, data):
+    """Partial derivative of function pdf with respect to variable at index."""
     args = point[:]
 
     def wraps(x):
