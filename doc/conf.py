@@ -1,6 +1,5 @@
 # Configuration file for the sweights sphinx documentation builder.
 from sweights import __version__ as release  # noqa
-import sphinx_rtd_theme
 
 project = "sweights"
 copyright = "2023, Matt Kenzie and Hans Dembinski"
