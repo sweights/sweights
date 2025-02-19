@@ -1,20 +1,23 @@
 """Implementation of covariance correction for weighted fits."""
 
 import numpy as np
-from scipy.differentiate import derivative
 
-# derivative of function pdf with respect to variable at index var
-# evaluated at point point
+try:
+    from scipy.differentiate import derivative
+except ImportError:
+    # fallback for scipy versions older than 1.12.0
+    from scipy.misc import derivative
 
 
 def _partial_derivative(pdf, var, point, data):
+    """Partial derivative of function pdf with respect to variable at index."""
     args = point[:]
 
     def wraps(x):
         args[var] = x
         return pdf(data, *args)
 
-    return derivative(wraps, point[var], dx=1e-6)
+    return derivative(wraps, point[var])
 
 
 def approx_cov_correct(pdf, data, wts, fvals, fcov, verbose=False):
