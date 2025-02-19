@@ -1,6 +1,5 @@
 # Configuration file for the sweights sphinx documentation builder.
 from sweights import __version__ as release  # noqa
-import sphinx_rtd_theme
 
 project = "sweights"
 copyright = "2023, Matt Kenzie and Hans Dembinski"
@@ -72,7 +71,6 @@ html_static_path = ["_static"]
 html_logo = "_static/sweights_logo.svg"
 
 html_theme = "sphinx_rtd_theme"
-html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 nbsphinx_kernel_name = "python3"
 nbsphinx_execute_arguments = [
