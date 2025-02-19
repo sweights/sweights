@@ -52,6 +52,7 @@ where = ["src"]
 
 [tool.ruff]
 src = ["src"]
+line-length = 99
 
 [tool.ruff.lint]
 extend-select = ["E", "F", "W", "D"]
