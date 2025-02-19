@@ -1,6 +1,7 @@
 """Implementation of covariance correction for weighted fits."""
 
 import numpy as np
+
 try:
     from scipy.differentiate import derivative
 except ImportError:
