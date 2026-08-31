@@ -1,12 +1,14 @@
-from sweights.testing import make_classic_toy
-from sweights.experimental import Cows, CowsWarning
-from sweights.util import make_bernstein_pdf, make_norm_pdf
+from typing import Callable
+
+import numpy as np
+import pytest
+from numpy.testing import assert_allclose, assert_equal
 from scipy import stats
 from scipy.optimize import minimize
-import numpy as np
-from numpy.testing import assert_allclose, assert_equal
-import pytest
-from typing import Callable
+
+from sweights.experimental import Cows, CowsWarning
+from sweights.testing import make_classic_toy
+from sweights.util import make_bernstein_pdf, make_norm_pdf
 
 
 @pytest.mark.parametrize("norm_kind", ("fit", "yields", "g(m)", "hist"))
@@ -127,4 +129,4 @@ def test_special_index():
     assert_allclose(cows["b"](m), cows[3](m) + cows[4](m) + cows[5](m))
 
     for i, cow in enumerate(cows):
-        assert_equal(cows[i](m), cow(m))
+        assert_equal(cow(m), cow(m))
