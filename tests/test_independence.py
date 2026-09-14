@@ -1,7 +1,8 @@
 import numpy as np
-from sweights.independence import plot_indep_scatter, kendall_tau
-from scipy.stats import chi2
 from numpy.testing import assert_allclose
+from scipy.stats import chi2
+
+from sweights.independence import kendall_tau, plot_indep_scatter
 
 
 def test_kendall_tau():
