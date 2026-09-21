@@ -1,12 +1,15 @@
 """Implementation of the COW class."""
 
-from scipy.integrate import quad
-from scipy import linalg
+import warnings
+from collections.abc import Sequence
+from typing import Any, List, Optional, Tuple, Union
+
 import numpy as np
-from typing import Union, Tuple, Optional, Sequence, List, Any
+from scipy import linalg
+from scipy.integrate import quad
+
 from .typing import Density, FloatArray, Range
 from .util import normalized, pdf_from_histogram
-import warnings
 
 __all__ = ["Cow"]
 
@@ -118,7 +121,7 @@ class Cow:
         if verbose:
             print("Initialising COW:")
 
-        self.Wkl = _compute_W(self.gk, self.Im, xe)  # type:ignore
+        self.Wkl = _compute_W(self.gk, self.Im, xe)  # type: ignore
         if verbose:
             print("    W-matrix:")
             print("\t" + str(self.Wkl).replace("\n", "\n\t "))
@@ -150,7 +153,7 @@ class Cow:
 
         """
         if idx == -1:
-            return sum(self.get_weight(k, m) for k in range(self.ksig))  # type:ignore
+            return sum(self.get_weight(k, m) for k in range(self.ksig))  # type: ignore
         return self.get_weight(idx, m)
 
     def get_weight(self, k: int, m: FloatArray) -> FloatArray:
@@ -173,7 +176,7 @@ class Cow:
         im = self.Im(m)
         gm = [g(m) / im for g in self.gk]
         A = self.Akl[k]
-        return A @ gm  # type:ignore
+        return A @ gm  # type: ignore
 
     # alias for get_weight
     wk = get_weight
@@ -227,6 +230,6 @@ def _compute_W_element(
     result = 0
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
-        for x0, x1 in zip(me[:-1], me[1:]):  # type:ignore
+        for x0, x1 in zip(me[:-1], me[1:]):  # type: ignore
             result += quad(fn, x0, x1)[0]
     return result
