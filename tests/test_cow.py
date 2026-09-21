@@ -1,10 +1,11 @@
-from sweights.testing import make_classic_toy
-from sweights.cow import Cow
-from scipy.stats import norm, expon
-from scipy.optimize import minimize
 import numpy as np
-from numpy.testing import assert_allclose, assert_equal
 import pytest
+from numpy.testing import assert_allclose, assert_equal
+from scipy.optimize import minimize
+from scipy.stats import expon, norm
+
+from sweights.cow import Cow
+from sweights.testing import make_classic_toy
 
 
 @pytest.mark.parametrize("Im_kind", ("const", "g(m)", "hist"))
