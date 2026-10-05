@@ -1,9 +1,11 @@
 """Module to check and plot independence."""
 
+from typing import Any, Optional, Tuple
+
 from scipy.stats import kendalltau
-from .util import import_optional_module
+
 from .typing import FloatArray
-from typing import Tuple, Any, Optional
+from .util import import_optional_module
 
 __all__ = ["kendall_tau", "plot_indep_scatter"]
 

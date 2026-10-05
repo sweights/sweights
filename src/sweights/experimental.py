@@ -1,20 +1,23 @@
 """Implementation of the new v2 interface for COWs classes."""
 
-from scipy.linalg import solve
-from scipy.stats import uniform
+import warnings
+from collections.abc import Sequence
+from functools import partial
+from typing import Callable, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 from numpy.typing import ArrayLike
-from typing import Union, Tuple, Optional, Sequence, List, Dict, Callable
+from scipy.linalg import solve
+from scipy.stats import uniform
+
 from .typing import Density, FloatArray, Range
 from .util import (
-    pdf_from_histogram,
-    fit_mixture,
-    _quad_workaround,
-    _get_pdf_parameters,
     FitValidation,
+    _get_pdf_parameters,
+    _quad_workaround,
+    fit_mixture,
+    pdf_from_histogram,
 )
-import warnings
-from functools import partial
 
 
 class CowsWarning(UserWarning):
@@ -44,7 +47,7 @@ class Cows:
     ``yields``.
     """
 
-    __slots__ = ("pdfs", "norm", "yields", "_wm", "_am", "_sig")
+    __slots__ = ("_am", "_sig", "_wm", "norm", "pdfs", "yields")
 
     pdfs: List[Density]
     norm: Density
@@ -241,11 +244,11 @@ class Cows:
         """
         if isinstance(idx, str):
             if idx == "s":
-                return lambda x: sum(  # type:ignore
+                return lambda x: sum(  # type: ignore
                     self._component(i, x) for i in range(self._sig)
                 )
             elif idx == "b":
-                return lambda x: sum(  # type:ignore
+                return lambda x: sum(  # type: ignore
                     self._component(i, x) for i in range(self._sig, len(self))
                 )
             else:
@@ -346,7 +349,7 @@ def _fit_mixture(
     nfit = len(yields)
     for pdf, kwargs in zip(pdfs, list_of_kwargs):
         if kwargs:
-            fitted_pdfs.append(partial(pdf, **kwargs))  # type:ignore
+            fitted_pdfs.append(partial(pdf, **kwargs))  # type: ignore
             nfit += len(kwargs)
         else:
             fitted_pdfs.append(pdf)
