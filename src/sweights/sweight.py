@@ -1,14 +1,16 @@
 """Implementation of the SWeight class."""
 
+from tempfile import NamedTemporaryFile
+
 import numpy as np
 from scipy.integrate import nquad
-from scipy.linalg import solve
 from scipy.interpolate import InterpolatedUnivariateSpline
-from .util import import_optional_module, convert_rf_pdf
-from tempfile import NamedTemporaryFile
-from .typing import FloatArray
+from scipy.linalg import solve
 
-__all__ = ["convert_rf_pdf", "SWeight"]
+from .typing import FloatArray
+from .util import convert_rf_pdf, import_optional_module
+
+__all__ = ["SWeight", "convert_rf_pdf"]
 
 
 class SWeight:
@@ -120,10 +122,8 @@ class SWeight:
         if len(self.data.shape) == 1:
             self.data = self.data.reshape(len(self.data), 1)
         if not len(self.data.shape) == 2:
-            raise ValueError(
-                """Input data is in the wrong format. Should be a numpy
-                array with shape (nevs,ncomps)"""
-            )
+            raise ValueError("""Input data is in the wrong format. Should be a numpy
+                array with shape (nevs,ncomps)""")
         self.nevs = self.data.shape[0]
         self.ndiscvars = self.data.shape[1]
 
@@ -401,7 +401,7 @@ class SWeight:
         """
         if self.ndiscvars != 1:
             print("WARNING - I dont know how to plot this")
-            return None
+            return
 
         while len(dopts) < self.ncomps:
             dopts.append("b")
@@ -415,7 +415,7 @@ class SWeight:
 
         x = np.linspace(*self.discvarranges[0], 400)
 
-        labels = labels or ["$w_{{{0}}}$".format(comp) for comp in self.compnames]
+        labels = labels or [f"$w_{{{comp}}}$" for comp in self.compnames]
 
         for comp in range(self.ncomps):
             ax.plot(
@@ -449,10 +449,8 @@ class SWeight:
                         / self.pdfnorms[j],
                         self.discvarranges,
                     )[0]
-            print(
-                """    Integral of w*pdf matrix (should be close to the
-                identity):"""
-            )
+            print("""    Integral of w*pdf matrix (should be close to the
+                identity):""")
             # with np.printoptions(precision=3, suppress=True):
             print("\t" + str(self.intws).replace("\n", "\n\t"))
 
@@ -468,9 +466,7 @@ class SWeight:
 
         for i, yld in enumerate(self.yields):
             print(
-                "\t  {:<8d} | {:10.4f} | {:10.4f} | {:8.2f}% |".format(
-                    i, self.sows[i], yld, 100.0 * (yld - self.sows[i]) / self.sows[i]
-                )
+                f"\t  {i:<8d} | {self.sows[i]:10.4f} | {yld:10.4f} | {100.0 * (yld - self.sows[i]) / self.sows[i]:8.2f}% |"
             )
 
     def _run_tsplot(self):
@@ -539,10 +535,8 @@ class SWeight:
         rf_obs = R.RooArgList()
         for obs in self.rfobs:
             if not obs.InheritsFrom("RooAbsReal"):
-                raise RuntimeError(
-                    """Found an observable which does not inherit from
-                    RooAbsReal"""
-                )
+                raise RuntimeError("""Found an observable which does not inherit from
+                    RooAbsReal""")
             rf_obs.add(obs)
 
         # make the roodataset and fill it
