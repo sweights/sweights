@@ -1,8 +1,10 @@
 """Toy distributions to use in examples."""
 
+from typing import Callable, List, Tuple, Union
+
 import numpy as np
-from typing import Tuple, Callable, Union, List
-from scipy.stats import norm, expon
+from scipy.stats import expon, norm
+
 from .typing import FloatArray
 
 
@@ -77,19 +79,19 @@ def make_classic_toy(
     dts = expon(0, ts_mu)
     dtb = norm(tb_mu, tb_sigma)
 
-    t_s = dts.ppf(rng.uniform(*dts.cdf(trange), size=n_sig))  # type:ignore
-    t_b = dtb.ppf(rng.uniform(*dtb.cdf(trange), size=n_bkg))  # type:ignore
+    t_s = dts.ppf(rng.uniform(*dts.cdf(trange), size=n_sig))  # type: ignore
+    t_b = dtb.ppf(rng.uniform(*dtb.cdf(trange), size=n_bkg))  # type: ignore
 
     t = np.append(t_s, t_b)
 
     dms = norm(ms_mu, ms_sigma)
-    m_s = dms.ppf(rng.uniform(*dms.cdf(mrange), size=n_sig))  # type:ignore
+    m_s = dms.ppf(rng.uniform(*dms.cdf(mrange), size=n_sig))  # type: ignore
 
     m_b: Union[FloatArray, List[float]]
     if isinstance(mb_mu, (int, float)):
         dmb = expon(0, mb_mu)
 
-        m_b = dmb.ppf(rng.uniform(*dmb.cdf(mrange), size=n_bkg))  # type:ignore
+        m_b = dmb.ppf(rng.uniform(*dmb.cdf(mrange), size=n_bkg))  # type: ignore
     else:
         m_b = []
         for mui in mb_mu(t_b):

@@ -4,8 +4,9 @@ Noxfile for iminuit.
 Pass extra arguments to pytest after --
 """
 
-import nox
 import sys
+
+import nox
 
 sys.path.append(".")
 import python_releases
