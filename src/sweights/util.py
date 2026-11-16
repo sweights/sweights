@@ -1,39 +1,41 @@
 """Various utilities used by the package or in the tutorials."""
 
-from packaging.version import Version
+import enum
+import warnings
+from collections.abc import Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
+
 import numpy as np
-from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
+from iminuit import Minuit
+from iminuit.cost import ExtendedUnbinnedNLL
+from iminuit.util import describe
+from numpy.typing import ArrayLike
+from packaging.version import Version
 from scipy.integrate import quad
+from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from scipy.special import comb
 from scipy.stats import chi2, norm
-import warnings
-from typing import (
-    Tuple,
-    Optional,
-    Union,
-    Any,
-    TYPE_CHECKING,
-    List,
-    Callable,
-    Sequence,
-    Dict,
-)
-from .typing import RooAbsPdf, RooRealVar, Density, FloatArray, Range
-from numpy.typing import ArrayLike
-from iminuit import Minuit
-from iminuit.util import describe
-from iminuit.cost import ExtendedUnbinnedNLL
-import enum
+
+from .typing import Density, FloatArray, Range, RooAbsPdf, RooRealVar
 
 __all__ = [
-    "convert_rf_pdf",
-    "plot_binned",
-    "normalized",
-    "pdf_from_histogram",
     "BernsteinBasisPdf",
+    "convert_rf_pdf",
     "make_bernstein_pdf",
     "make_norm_pdf",
     "make_weighted_negative_log_likelihood",
+    "normalized",
+    "pdf_from_histogram",
+    "plot_binned",
 ]
 
 
@@ -156,8 +158,7 @@ def convert_rf_pdf(
     else:
         wrapper = getattr(R, "RooAbsPdfPythonWrapper", None)
         if wrapper is None:
-            R.gInterpreter.Declare(
-                """std::vector<double> RooAbsPdfPythonWrapper(
+            R.gInterpreter.Declare("""std::vector<double> RooAbsPdfPythonWrapper(
                     const std::vector<double>& x, RooAbsPdf* pdf, RooRealVar* obs) {{
             std::vector<double> result;
             result.reserve(x.size());
@@ -167,9 +168,8 @@ def convert_rf_pdf(
                 result.push_back(pdf->getVal(nset));
             }}
             return result;
-}}"""
-            )
-            wrapper = getattr(R, "RooAbsPdfPythonWrapper")
+}}""")
+            wrapper = R.RooAbsPdfPythonWrapper
 
         def fn(x: FloatArray) -> FloatArray:
             r = wrapper(x, pdf, obs)
@@ -338,7 +338,7 @@ class truncnorm:
         self.norm = d.cdf(b) - d.cdf(a)
 
     def __call__(self, x: FloatArray) -> FloatArray:
-        return self.d.pdf(x) / self.norm  # type:ignore
+        return self.d.pdf(x) / self.norm  # type: ignore
 
 
 def make_norm_pdf(
@@ -386,8 +386,8 @@ def make_weighted_negative_log_likelihood(
         lp = safe_log(model(x, *args))
         return -2 * np.sum(weights * lp)
 
-    nll.errordef = 1.0  # type:ignore
-    nll._parameters = parameters  # type:ignore
+    nll.errordef = 1.0  # type: ignore
+    nll._parameters = parameters  # type: ignore
 
     return nll
 
@@ -512,7 +512,7 @@ def _fit_mixture(
 
     starts2: FloatArray = np.concatenate([yield_starts] + starts)
     bounds2: FloatArray = np.concatenate(
-        [yield_bounds] + bounds, axis=0  # type:ignore
+        [yield_bounds] + bounds, axis=0  # type: ignore
     )
     nll = ExtendedUnbinnedNLL(x, model)
     min = Minuit(nll, *starts2, name=names)
@@ -546,7 +546,7 @@ def _fit_mixture(
 def _guess_starting_value(a: float, b: float) -> float:
     if a > -np.inf and b < np.inf:
         return 0.5 * (a + b)
-    return np.clip(0, a * 1.1 + 1, b * 0.9 - 1)  # type:ignore
+    return np.clip(0, a * 1.1 + 1, b * 0.9 - 1)  # type: ignore
 
 
 def _guess_starting_yields(ndata: int, nyields: int) -> List[float]:
@@ -558,7 +558,7 @@ TINY_FLOAT = np.finfo(float).tiny
 
 def safe_log(x: FloatArray) -> FloatArray:
     # guard against x = 0
-    return np.log(np.maximum(TINY_FLOAT, x))  # type:ignore
+    return np.log(np.maximum(TINY_FLOAT, x))  # type: ignore
 
 
 class GofWarning(UserWarning):
@@ -616,16 +616,16 @@ def gof_pvalue(
 
     # G-test, test statistic is asymptotically chi-square distributed
     g = np.sum(2 * counts * np.log(counts / (pn * ntot)))
-    return chi2(bins - nfit).sf(g)  # type:ignore
+    return chi2(bins - nfit).sf(g)  # type: ignore
 
 
 def _quad_workaround(
     fn: Callable[[FloatArray], FloatArray], a: float, b: float
 ) -> float:
     def wrapped(x: float) -> float:
-        return fn(np.atleast_1d(x))[0]  # type:ignore
+        return fn(np.atleast_1d(x))[0]  # type: ignore
 
-    return quad(wrapped, a, b)[0]  # type:ignore
+    return quad(wrapped, a, b)[0]  # type: ignore
 
 
 def _get_pdf_parameters(fn: Density) -> Dict[str, Range]:
