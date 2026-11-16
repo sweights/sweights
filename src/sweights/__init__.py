@@ -1,23 +1,24 @@
 """Python interface to produce sweights and cows."""
 
 __all__ = [
+    "Cow",
     "Cows",
     "SWeight",
-    "Cow",
+    "__version__",
+    "approx_cov_correct",
     "convert_rf_pdf",
+    "cov_correct",
     "kendall_tau",
     "plot_indep_scatter",
-    "cov_correct",
-    "approx_cov_correct",
-    "__version__",
 ]
 
 from importlib.metadata import version
-from .experimental import Cows
-from .sweight import SWeight
+
+from .covariance import approx_cov_correct, cov_correct
 from .cow import Cow
+from .experimental import Cows
 from .independence import kendall_tau, plot_indep_scatter
-from .covariance import cov_correct, approx_cov_correct
+from .sweight import SWeight
 from .util import convert_rf_pdf
 
 __version__ = version("sweights")
