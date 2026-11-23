@@ -1,13 +1,15 @@
-import pytest
-import numpy as np
-from numpy.testing import assert_allclose
-from sweights import util
-from scipy.integrate import quad
-from scipy.stats import norm, expon
-from typing import Annotated
-from iminuit.typing import Interval
 import sys
 from pathlib import Path
+from typing import Annotated
+
+import numpy as np
+import pytest
+from iminuit.typing import Interval
+from numpy.testing import assert_allclose
+from scipy.integrate import quad
+from scipy.stats import expon, norm
+
+from sweights import util
 
 
 def test_import_optional_module():
